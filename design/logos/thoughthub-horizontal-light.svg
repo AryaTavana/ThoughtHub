@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="224" viewBox="0 0 760 224" role="img" aria-labelledby="title desc">
+  <title id="title">ThoughtHub horizontal logo</title>
+  <desc id="desc">ThoughtHub icon on the left and bold wordmark on the right.</desc>
+  <g transform="translate(0 0)">
+
+  <defs>
+    <linearGradient id="brandGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Stylized TH monogram -->
+  <g fill="url(#brandGradient)">
+    <!-- T -->
+    <rect x="32" y="20" width="104" height="28" rx="8"/>
+    <path d="M70 44h30v112c0 18-12 34-30 42V44z"/>
+    <!-- H / speech-bubble form -->
+    <path d="M108 64h28v42h38V52c0-18 14-32 32-32h30v124c0 18-14 32-32 32h-6l-24 26v-62h-38v42h-28V64z"/>
+  </g>
+
+  <!-- Article lines -->
+  <g fill="#FFFFFF">
+    <rect x="190" y="72" width="28" height="7" rx="3.5"/>
+    <rect x="190" y="88" width="28" height="7" rx="3.5"/>
+    <rect x="190" y="104" width="28" height="7" rx="3.5"/>
+  </g>
+
+  </g>
+
+  <rect x="286" y="42" width="2" height="140" rx="1" fill="#E4E4E7"/>
+
+  <defs>
+    <linearGradient id="wordGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7C3AED"/>
+      <stop offset="100%" stop-color="#2563EB"/>
+    </linearGradient>
+  </defs>
+
+  <text x="326" y="137"
+        font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        font-size="66"
+        font-weight="800"
+        letter-spacing="-2.2">
+    <tspan fill="#09090B">Thought</tspan><tspan fill="url(#wordGradient)">Hub</tspan>
+  </text>
+</svg>

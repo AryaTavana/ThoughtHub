@@ -14,6 +14,9 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+from django.templatetags.static import static
+from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -35,12 +38,15 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'unfold',
+    'unfold.contrib.forms',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'Blog.apps.BlogConfig',
 ]
 
 MIDDLEWARE = [
@@ -124,3 +130,144 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [BASE_DIR / 'design']
+
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+
+UNFOLD = {
+    'SITE_TITLE': 'ThoughtHub administration',
+    'SITE_HEADER': 'ThoughtHub',
+    'SITE_SUBHEADER': 'Editorial workspace',
+    'SITE_ICON': {
+        'light': lambda request: static('logos/thoughthub-icon-light.svg'),
+        'dark': lambda request: static('logos/thoughthub-icon-dark.svg'),
+    },
+    'SITE_LOGO': {
+        'light': lambda request: static(
+            'logos/thoughthub-horizontal-light.svg',
+        ),
+        'dark': lambda request: static(
+            'logos/thoughthub-horizontal-dark.svg',
+        ),
+    },
+    'SITE_FAVICONS': [
+        {
+            'rel': 'icon',
+            'sizes': 'any',
+            'type': 'image/svg+xml',
+            'href': lambda request: static(
+                'logos/thoughthub-icon-light.svg',
+            ),
+        },
+    ],
+    'BORDER_RADIUS': '8px',
+    'COLORS': {
+        'base': {
+            '50': '#fafafa',
+            '100': '#f4f4f5',
+            '200': '#e4e4e7',
+            '300': '#d4d4d8',
+            '400': '#a1a1aa',
+            '500': '#71717a',
+            '600': '#52525b',
+            '700': '#3f3f46',
+            '800': '#27272a',
+            '900': '#18181b',
+            '950': '#09090b',
+        },
+        'primary': {
+            '50': '#eff6ff',
+            '100': '#dbeafe',
+            '200': '#bfdbfe',
+            '300': '#93c5fd',
+            '400': '#60a5fa',
+            '500': '#3b82f6',
+            '600': '#2563eb',
+            '700': '#1d4ed8',
+            '800': '#1e40af',
+            '900': '#1e3a8a',
+            '950': '#172554',
+        },
+    },
+    'STYLES': [
+        lambda request: static('admin/unfold.css'),
+    ],
+    'SIDEBAR': {
+        'show_search': True,
+        'show_all_applications': False,
+        'navigation': [
+            {
+                'title': _('Workspace'),
+                'items': [
+                    {
+                        'title': _('Dashboard'),
+                        'icon': 'space_dashboard',
+                        'link': reverse_lazy('admin:index'),
+                    },
+                ],
+            },
+            {
+                'title': _('Publishing'),
+                'separator': True,
+                'items': [
+                    {
+                        'title': _('Posts'),
+                        'icon': 'article',
+                        'link': reverse_lazy(
+                            'admin:Blog_post_changelist',
+                        ),
+                    },
+                    {
+                        'title': _('Content blocks'),
+                        'icon': 'view_carousel',
+                        'link': reverse_lazy(
+                            'admin:Blog_postblock_changelist',
+                        ),
+                    },
+                ],
+            },
+            {
+                'title': _('Organization'),
+                'separator': True,
+                'items': [
+                    {
+                        'title': _('Categories'),
+                        'icon': 'category',
+                        'link': reverse_lazy(
+                            'admin:Blog_category_changelist',
+                        ),
+                    },
+                    {
+                        'title': _('Tags'),
+                        'icon': 'sell',
+                        'link': reverse_lazy(
+                            'admin:Blog_tag_changelist',
+                        ),
+                    },
+                ],
+            },
+            {
+                'title': _('Access'),
+                'separator': True,
+                'items': [
+                    {
+                        'title': _('Users'),
+                        'icon': 'group',
+                        'link': reverse_lazy(
+                            'admin:auth_user_changelist',
+                        ),
+                    },
+                    {
+                        'title': _('Groups'),
+                        'icon': 'shield_person',
+                        'link': reverse_lazy(
+                            'admin:auth_group_changelist',
+                        ),
+                    },
+                ],
+            },
+        ],
+    },
+}

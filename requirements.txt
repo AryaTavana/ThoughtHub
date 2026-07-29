@@ -1,7 +1,8 @@
 asgiref==3.12.1
 Django==6.0.7
 django-unfold==0.102.0
-Pillow==12.3.0
+djangorestframework==3.17.1
+pillow==12.3.0
 psycopg==3.3.4
 psycopg-binary==3.3.4
 python-dotenv==1.2.2

@@ -2,7 +2,10 @@ from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase, TestCase
+from django.urls import reverse
 from django.utils import timezone
+from rest_framework import status
+from rest_framework.test import APITestCase
 
 from .admin import PostAdminForm
 from .models import Post, PostBlock
@@ -98,8 +101,8 @@ class PostValidationTests(SimpleTestCase):
         )
 
         with self.assertRaisesMessage(
-            ValidationError,
-            'Only draft or rejected posts can be submitted for review.',
+                ValidationError,
+                'Only draft or rejected posts can be submitted for review.',
         ):
             post.submit_for_review()
 
@@ -136,8 +139,8 @@ class PostValidationTests(SimpleTestCase):
         )
 
         with self.assertRaisesMessage(
-            ValidationError,
-            'Only posts in review can be approved.',
+                ValidationError,
+                'Only posts in review can be approved.',
         ):
             post.approve()
 
@@ -162,8 +165,8 @@ class PostValidationTests(SimpleTestCase):
         )
 
         with self.assertRaisesMessage(
-            ValidationError,
-            'Add feedback when rejecting a post.',
+                ValidationError,
+                'Add feedback when rejecting a post.',
         ):
             post.reject(feedback='   ')
 
@@ -174,8 +177,8 @@ class PostValidationTests(SimpleTestCase):
         )
 
         with self.assertRaisesMessage(
-            ValidationError,
-            'Only posts in review can be rejected.',
+                ValidationError,
+                'Only posts in review can be rejected.',
         ):
             post.reject(feedback='Needs work.')
 
@@ -187,8 +190,8 @@ class PostValidationTests(SimpleTestCase):
         )
 
         with self.assertRaisesMessage(
-            ValidationError,
-            'Add feedback when rejecting a post.',
+                ValidationError,
+                'Add feedback when rejecting a post.',
         ):
             post.clean()
 
@@ -200,6 +203,152 @@ class PostValidationTests(SimpleTestCase):
         )
 
         post.clean()
+
+
+class PublicPostListAPITests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.public_post = Post.objects.create(
+            title='Public post',
+            content='Public content',
+            status=Post.Status.PUBLISHED,
+        )
+        cls.due_scheduled_post = Post.objects.create(
+            title='Due scheduled post',
+            content='Scheduled content',
+            status=Post.Status.SCHEDULED,
+            published_at=timezone.now() - timedelta(minutes=1),
+        )
+
+        Post.objects.create(
+            title='Draft post',
+            status=Post.Status.DRAFT,
+        )
+        Post.objects.create(
+            title='Review post',
+            status=Post.Status.IN_REVIEW,
+        )
+        Post.objects.create(
+            title='Rejected post',
+            status=Post.Status.REJECTED,
+            review_feedback='Needs improvement.',
+        )
+        Post.objects.create(
+            title='Future post',
+            status=Post.Status.SCHEDULED,
+            published_at=timezone.now() + timedelta(days=1),
+        )
+        Post.objects.create(
+            title='Archived post',
+            status=Post.Status.ARCHIVED,
+        )
+
+        cls.url = reverse('blog:public-post-list')
+
+    def test_anonymous_visitor_sees_only_public_posts(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        returned_slugs = {
+            post_data['slug']
+            for post_data in response.data['results']
+        }
+        self.assertEqual(
+            returned_slugs,
+            {
+                self.public_post.slug,
+                self.due_scheduled_post.slug,
+            },
+        )
+        self.assertEqual(response.data['count'], 2)
+        self.assertIsNone(response.data['next'])
+        self.assertIsNone(response.data['previous'])
+
+    def test_post_method_is_not_allowed(self):
+        response = self.client.post(
+            self.url,
+            {'title': 'Unauthorized post'},
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+
+
+class PublicPostDetailAPITests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.public_post = Post.objects.create(
+            title='آموزش جنگو',
+            slug='آموزش-جنگو',
+            content='Public introduction',
+            status=Post.Status.PUBLISHED,
+        )
+        cls.block = PostBlock.objects.create(
+            post=cls.public_post,
+            block_type=PostBlock.BlockType.RICH_TEXT,
+            position=0,
+            content='<p>Public block content</p>',
+        )
+        cls.draft_post = Post.objects.create(
+            title='Private draft',
+            slug='private-draft',
+            content='Private content',
+            status=Post.Status.DRAFT,
+        )
+
+    def test_anonymous_visitor_can_read_published_unicode_slug(self):
+        url = reverse(
+            'blog:public-post-detail',
+            kwargs={'slug': self.public_post.slug},
+        )
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['slug'], self.public_post.slug)
+        self.assertEqual(
+            response.data['content'],
+            'Public introduction',
+        )
+        self.assertEqual(len(response.data['blocks']), 1)
+        self.assertEqual(
+            response.data['blocks'][0]['content'],
+            '<p>Public block content</p>',
+        )
+
+    def test_draft_post_returns_not_found(self):
+        url = reverse(
+            'blog:public-post-detail',
+            kwargs={'slug': self.draft_post.slug},
+        )
+
+        response = self.client.get(url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    def test_update_method_is_not_allowed(self):
+        url = reverse(
+            'blog:public-post-detail',
+            kwargs={'slug': self.public_post.slug},
+        )
+
+        response = self.client.patch(
+            url,
+            {'title': 'Changed by visitor'},
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
 
 
 class PostModelTests(TestCase):

@@ -264,9 +264,9 @@ class Post(models.Model):
     @property
     def is_public(self):
         return (
-            self.status in {self.Status.PUBLISHED, self.Status.SCHEDULED}
-            and self.published_at is not None
-            and self.published_at <= timezone.now()
+                self.status in {self.Status.PUBLISHED, self.Status.SCHEDULED}
+                and self.published_at is not None
+                and self.published_at <= timezone.now()
         )
 
     @property
@@ -275,13 +275,14 @@ class Post(models.Model):
         text_parts = [self.content]
 
         if self.pk:
+            text_block_types = (
+                PostBlock.BlockType.RICH_TEXT,
+                PostBlock.BlockType.QUOTE,
+            )
             text_parts.extend(
-                self.blocks.filter(
-                    block_type__in=(
-                        PostBlock.BlockType.RICH_TEXT,
-                        PostBlock.BlockType.QUOTE,
-                    ),
-                ).values_list('content', flat=True),
+                block.content
+                for block in self.blocks.all()
+                if block.block_type in text_block_types
             )
 
         word_count = len(strip_tags(' '.join(text_parts)).split())

@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     AuthorPostDetailView,
     AuthorPostListView,
+    AuthorPostSubmitView,
     PublicPostDetailView,
     PublicPostListView,
 )
@@ -21,5 +22,10 @@ urlpatterns = [
         'dashboard/posts/<int:pk>/',
         AuthorPostDetailView.as_view(),
         name='author-post-detail',
+    ),
+    path(
+        'dashboard/posts/<int:pk>/submit/',
+        AuthorPostSubmitView.as_view(),
+        name='author-post-submit',
     ),
 ]

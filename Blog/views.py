@@ -1,10 +1,15 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.shortcuts import get_object_or_404
 from rest_framework.generics import (
     ListAPIView,
     ListCreateAPIView,
     RetrieveAPIView,
     RetrieveUpdateDestroyAPIView,
 )
+from rest_framework.exceptions import ValidationError as APIValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .models import Post
 from .serializers import (
@@ -84,3 +89,39 @@ class AuthorPostDetailView(RetrieveUpdateDestroyAPIView):
             post.apply_author_edit()
 
         serializer.save()
+
+
+class AuthorPostSubmitView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request, pk):
+        queryset = (
+            Post.objects.filter(author=request.user)
+            .select_related('author', 'category')
+            .prefetch_related('tags', 'blocks')
+        )
+        post = get_object_or_404(queryset, pk=pk)
+
+        try:
+            post.submit_for_review()
+            post.full_clean()
+        except DjangoValidationError as error:
+            details = (
+                error.message_dict
+                if hasattr(error, 'message_dict')
+                else error.messages
+            )
+            raise APIValidationError(details) from error
+
+        post.save(
+            update_fields=(
+                'status',
+                'review_feedback',
+                'updated_at',
+            ),
+        )
+        serializer = AuthorPostWriteSerializer(
+            post,
+            context={'request': request},
+        )
+        return Response(serializer.data)

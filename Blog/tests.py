@@ -861,6 +861,182 @@ class AuthorPostDetailAPITests(APITestCase):
         )
 
 
+class AuthorPostSubmitAPITests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        user_model = get_user_model()
+        cls.author = user_model.objects.create_user(
+            username='submit-author',
+            password='StrongPassword123!',
+        )
+        cls.other_author = user_model.objects.create_user(
+            username='submit-other-author',
+            password='StrongPassword123!',
+        )
+        cls.draft_post = Post.objects.create(
+            title='Ready draft',
+            author=cls.author,
+            status=Post.Status.DRAFT,
+        )
+        cls.rejected_post = Post.objects.create(
+            title='Corrected rejected post',
+            author=cls.author,
+            status=Post.Status.REJECTED,
+            review_feedback='Improve the conclusion.',
+        )
+        cls.in_review_post = Post.objects.create(
+            title='Already in review',
+            author=cls.author,
+            status=Post.Status.IN_REVIEW,
+        )
+        cls.published_post = Post.objects.create(
+            title='Already published',
+            author=cls.author,
+            status=Post.Status.PUBLISHED,
+        )
+        cls.scheduled_post = Post.objects.create(
+            title='Already scheduled',
+            author=cls.author,
+            status=Post.Status.SCHEDULED,
+            published_at=timezone.now() + timedelta(days=1),
+        )
+        cls.archived_post = Post.objects.create(
+            title='Archived post',
+            author=cls.author,
+            status=Post.Status.ARCHIVED,
+        )
+        cls.invalid_draft = Post.objects.create(
+            title='Draft with inaccessible image',
+            author=cls.author,
+            status=Post.Status.DRAFT,
+            featured_image='posts/missing-alt.jpg',
+        )
+        cls.other_post = Post.objects.create(
+            title='Another author draft for review',
+            author=cls.other_author,
+            status=Post.Status.DRAFT,
+        )
+
+    @staticmethod
+    def submit_url(post):
+        return reverse(
+            'blog:author-post-submit',
+            kwargs={'pk': post.pk},
+        )
+
+    def test_anonymous_visitor_cannot_submit_post(self):
+        response = self.client.post(self.submit_url(self.draft_post))
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.draft_post.refresh_from_db()
+        self.assertEqual(self.draft_post.status, Post.Status.DRAFT)
+
+    def test_author_can_submit_draft_for_review(self):
+        self.client.force_login(self.author)
+
+        response = self.client.post(self.submit_url(self.draft_post))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.draft_post.refresh_from_db()
+        self.assertEqual(
+            self.draft_post.status,
+            Post.Status.IN_REVIEW,
+        )
+        self.assertEqual(
+            response.data['status'],
+            Post.Status.IN_REVIEW,
+        )
+
+    def test_author_can_resubmit_rejected_post_and_feedback_is_cleared(self):
+        self.client.force_login(self.author)
+
+        response = self.client.post(self.submit_url(self.rejected_post))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.rejected_post.refresh_from_db()
+        self.assertEqual(
+            self.rejected_post.status,
+            Post.Status.IN_REVIEW,
+        )
+        self.assertEqual(self.rejected_post.review_feedback, '')
+        self.assertEqual(response.data['review_feedback'], '')
+
+    def test_posts_in_other_statuses_cannot_be_submitted(self):
+        self.client.force_login(self.author)
+        invalid_posts = (
+            self.in_review_post,
+            self.published_post,
+            self.scheduled_post,
+            self.archived_post,
+        )
+
+        for post in invalid_posts:
+            with self.subTest(post_status=post.status):
+                response = self.client.post(self.submit_url(post))
+
+                self.assertEqual(
+                    response.status_code,
+                    status.HTTP_400_BAD_REQUEST,
+                )
+                self.assertIn('status', response.data)
+                post.refresh_from_db()
+                self.assertNotEqual(post.status, Post.Status.DRAFT)
+
+    def test_invalid_draft_cannot_enter_review_queue(self):
+        self.client.force_login(self.author)
+
+        response = self.client.post(self.submit_url(self.invalid_draft))
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertIn('featured_image_alt', response.data)
+        self.invalid_draft.refresh_from_db()
+        self.assertEqual(
+            self.invalid_draft.status,
+            Post.Status.DRAFT,
+        )
+
+    def test_author_cannot_submit_another_authors_post(self):
+        self.client.force_login(self.author)
+
+        response = self.client.post(self.submit_url(self.other_post))
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+        self.other_post.refresh_from_db()
+        self.assertEqual(self.other_post.status, Post.Status.DRAFT)
+
+    def test_submit_requires_csrf_token(self):
+        csrf_client = APIClient(enforce_csrf_checks=True)
+        csrf_client.force_login(self.author)
+
+        response = csrf_client.post(self.submit_url(self.draft_post))
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.draft_post.refresh_from_db()
+        self.assertEqual(self.draft_post.status, Post.Status.DRAFT)
+
+    def test_get_method_is_not_allowed(self):
+        self.client.force_login(self.author)
+
+        response = self.client.get(self.submit_url(self.draft_post))
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+
+
 class PostModelTests(TestCase):
     def test_slug_is_generated_and_made_unique(self):
         first_post = Post.objects.create(title='A useful Django post', content='Text')

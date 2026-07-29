@@ -1,4 +1,9 @@
-from rest_framework.generics import ListAPIView, RetrieveAPIView, ListCreateAPIView
+from rest_framework.generics import (
+    ListAPIView,
+    ListCreateAPIView,
+    RetrieveAPIView,
+    RetrieveUpdateDestroyAPIView,
+)
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from .models import Post
@@ -59,3 +64,23 @@ class AuthorPostListView(ListCreateAPIView):
             author=self.request.user,
             status=Post.Status.DRAFT,
         )
+
+
+class AuthorPostDetailView(RetrieveUpdateDestroyAPIView):
+    serializer_class = AuthorPostWriteSerializer
+    permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        return (
+            Post.objects.filter(author=self.request.user)
+            .select_related('author', 'category')
+            .prefetch_related('tags', 'blocks')
+        )
+
+    def perform_update(self, serializer):
+        post = serializer.instance
+
+        if serializer.validated_data:
+            post.apply_author_edit()
+
+        serializer.save()

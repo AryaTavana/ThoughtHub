@@ -607,6 +607,260 @@ class AuthorPostListCreateAPITests(APITestCase):
         self.assertEqual(created_post.status, Post.Status.DRAFT)
 
 
+class AuthorPostDetailAPITests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        user_model = get_user_model()
+        cls.author = user_model.objects.create_user(
+            username='detail-author',
+            password='StrongPassword123!',
+        )
+        cls.other_author = user_model.objects.create_user(
+            username='detail-other-author',
+            password='StrongPassword123!',
+        )
+        cls.category = Category.objects.create(
+            name='Backend',
+            slug='backend',
+        )
+        cls.tag = Tag.objects.create(
+            name='Python',
+            slug='python',
+        )
+        cls.draft_post = Post.objects.create(
+            title='Editable draft',
+            content='Original draft content',
+            author=cls.author,
+            status=Post.Status.DRAFT,
+        )
+        cls.published_post = Post.objects.create(
+            title='Published article',
+            content='Original published content',
+            author=cls.author,
+            status=Post.Status.PUBLISHED,
+        )
+        cls.scheduled_post = Post.objects.create(
+            title='Scheduled article',
+            content='Original scheduled content',
+            author=cls.author,
+            status=Post.Status.SCHEDULED,
+            published_at=timezone.now() + timedelta(days=1),
+        )
+        cls.rejected_post = Post.objects.create(
+            title='Rejected article',
+            content='Original rejected content',
+            author=cls.author,
+            status=Post.Status.REJECTED,
+            review_feedback='Rewrite the introduction.',
+        )
+        cls.other_post = Post.objects.create(
+            title='Other author draft',
+            author=cls.other_author,
+            status=Post.Status.DRAFT,
+        )
+
+    @staticmethod
+    def detail_url(post):
+        return reverse(
+            'blog:author-post-detail',
+            kwargs={'pk': post.pk},
+        )
+
+    def test_anonymous_visitor_cannot_retrieve_private_post(self):
+        response = self.client.get(self.detail_url(self.draft_post))
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_author_can_retrieve_owned_post(self):
+        self.client.force_login(self.author)
+
+        response = self.client.get(self.detail_url(self.draft_post))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['id'], self.draft_post.pk)
+        self.assertEqual(response.data['title'], 'Editable draft')
+        self.assertEqual(
+            response.data['content'],
+            'Original draft content',
+        )
+        self.assertEqual(response.data['status'], Post.Status.DRAFT)
+
+    def test_other_author_cannot_retrieve_post(self):
+        self.client.force_login(self.other_author)
+
+        response = self.client.get(self.detail_url(self.draft_post))
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    def test_other_author_cannot_update_post(self):
+        self.client.force_login(self.other_author)
+
+        response = self.client.patch(
+            self.detail_url(self.draft_post),
+            {'title': 'Unauthorized title'},
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+        self.draft_post.refresh_from_db()
+        self.assertEqual(self.draft_post.title, 'Editable draft')
+
+    def test_other_author_cannot_delete_post(self):
+        self.client.force_login(self.other_author)
+
+        response = self.client.delete(self.detail_url(self.draft_post))
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+        self.assertTrue(
+            Post.objects.filter(pk=self.draft_post.pk).exists(),
+        )
+
+    def test_author_can_update_editable_fields_on_draft(self):
+        self.client.force_login(self.author)
+
+        response = self.client.patch(
+            self.detail_url(self.draft_post),
+            {
+                'title': 'Updated draft',
+                'content': 'Updated draft content',
+                'category': self.category.pk,
+                'tags': [self.tag.pk],
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.draft_post.refresh_from_db()
+        self.assertEqual(self.draft_post.title, 'Updated draft')
+        self.assertEqual(
+            self.draft_post.content,
+            'Updated draft content',
+        )
+        self.assertEqual(self.draft_post.category, self.category)
+        self.assertEqual(list(self.draft_post.tags.all()), [self.tag])
+        self.assertEqual(self.draft_post.status, Post.Status.DRAFT)
+
+    def test_author_cannot_update_protected_fields(self):
+        self.client.force_login(self.author)
+
+        response = self.client.patch(
+            self.detail_url(self.draft_post),
+            {
+                'author': self.other_author.pk,
+                'status': Post.Status.PUBLISHED,
+                'review_feedback': 'Fake feedback',
+                'published_at': timezone.now().isoformat(),
+                'is_featured': True,
+                'views': 999,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.draft_post.refresh_from_db()
+        self.assertEqual(self.draft_post.author, self.author)
+        self.assertEqual(self.draft_post.status, Post.Status.DRAFT)
+        self.assertEqual(self.draft_post.review_feedback, '')
+        self.assertIsNone(self.draft_post.published_at)
+        self.assertFalse(self.draft_post.is_featured)
+        self.assertEqual(self.draft_post.views, 0)
+
+    def test_published_and_scheduled_posts_return_to_review_after_edit(self):
+        self.client.force_login(self.author)
+
+        for post in (self.published_post, self.scheduled_post):
+            with self.subTest(original_status=post.status):
+                response = self.client.patch(
+                    self.detail_url(post),
+                    {'excerpt': 'Edited by the author.'},
+                    format='json',
+                )
+
+                self.assertEqual(
+                    response.status_code,
+                    status.HTTP_200_OK,
+                )
+                post.refresh_from_db()
+                self.assertEqual(post.status, Post.Status.IN_REVIEW)
+                self.assertFalse(post.is_public)
+
+    def test_read_only_input_does_not_change_published_workflow_status(self):
+        self.client.force_login(self.author)
+
+        response = self.client.patch(
+            self.detail_url(self.published_post),
+            {'status': Post.Status.DRAFT},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.published_post.refresh_from_db()
+        self.assertEqual(
+            self.published_post.status,
+            Post.Status.PUBLISHED,
+        )
+        self.assertTrue(self.published_post.is_public)
+
+    def test_rejected_post_becomes_draft_after_edit(self):
+        self.client.force_login(self.author)
+
+        response = self.client.patch(
+            self.detail_url(self.rejected_post),
+            {'content': 'A rewritten introduction.'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.rejected_post.refresh_from_db()
+        self.assertEqual(self.rejected_post.status, Post.Status.DRAFT)
+        self.assertEqual(
+            self.rejected_post.review_feedback,
+            'Rewrite the introduction.',
+        )
+
+    def test_authenticated_update_requires_csrf_token(self):
+        csrf_client = APIClient(enforce_csrf_checks=True)
+        csrf_client.force_login(self.author)
+
+        response = csrf_client.patch(
+            self.detail_url(self.draft_post),
+            {'title': 'Missing CSRF update'},
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.draft_post.refresh_from_db()
+        self.assertEqual(self.draft_post.title, 'Editable draft')
+
+    def test_author_can_delete_owned_post(self):
+        self.client.force_login(self.author)
+
+        response = self.client.delete(self.detail_url(self.draft_post))
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_204_NO_CONTENT,
+        )
+        self.assertFalse(
+            Post.objects.filter(pk=self.draft_post.pk).exists(),
+        )
+
+
 class PostModelTests(TestCase):
     def test_slug_is_generated_and_made_unique(self):
         first_post = Post.objects.create(title='A useful Django post', content='Text')

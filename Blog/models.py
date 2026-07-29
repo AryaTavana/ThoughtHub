@@ -49,6 +49,7 @@ class Post(models.Model):
         IN_REVIEW = 'in_review', 'In review'
         SCHEDULED = 'scheduled', 'Scheduled'
         PUBLISHED = 'published', 'Published'
+        REJECTED = 'rejected', 'Rejected'
         ARCHIVED = 'archived', 'Archived'
 
     class PostType(models.TextChoices):
@@ -103,18 +104,22 @@ class Post(models.Model):
         blank=True,
         help_text='Describe the image for accessibility and SEO.',
     )
-
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
         default=Status.DRAFT,
         db_index=True,
     )
+    review_feedback = models.TextField(
+        blank=True,
+        help_text='Feedback from the admin after reviewing this post.',
+    )
     post_type = models.CharField(
         max_length=20,
         choices=PostType.choices,
         default=PostType.ARTICLE,
     )
+
     is_featured = models.BooleanField(default=False)
     allow_comments = models.BooleanField(default=True)
 
@@ -147,6 +152,65 @@ class Post(models.Model):
     def __str__(self):
         return self.title
 
+    def apply_author_edit(self):
+        """Update the workflow status after an author edits the post."""
+        if self.status in {
+            self.Status.PUBLISHED,
+            self.Status.SCHEDULED,
+        }:
+            self.status = self.Status.IN_REVIEW
+        elif self.status == self.Status.REJECTED:
+            self.status = self.Status.DRAFT
+
+    def submit_for_review(self):
+        """Move an editable post into the admin review queue."""
+        if self.status not in {
+            self.Status.DRAFT,
+            self.Status.REJECTED,
+        }:
+            raise ValidationError({
+                'status': (
+                    'Only draft or rejected posts can be submitted for review.'
+                ),
+            })
+
+        self.status = self.Status.IN_REVIEW
+        self.review_feedback = ''
+
+    def approve(self, *, publish_at=None):
+        """Approve a reviewed post for immediate or scheduled publication."""
+        if self.status != self.Status.IN_REVIEW:
+            raise ValidationError({
+                'status': 'Only posts in review can be approved.',
+            })
+
+        now = timezone.now()
+        publication_time = publish_at or now
+
+        self.published_at = publication_time
+        self.review_feedback = ''
+        self.status = (
+            self.Status.SCHEDULED
+            if publication_time > now
+            else self.Status.PUBLISHED
+        )
+
+    def reject(self, *, feedback):
+        """Reject a reviewed post and save actionable feedback."""
+        if self.status != self.Status.IN_REVIEW:
+            raise ValidationError({
+                'status': 'Only posts in review can be rejected.',
+            })
+
+        feedback = feedback.strip()
+        if not feedback:
+            raise ValidationError({
+                'review_feedback': 'Add feedback when rejecting a post.',
+            })
+
+        self.status = self.Status.REJECTED
+        self.review_feedback = feedback
+
     def clean(self):
         super().clean()
 
@@ -162,6 +226,11 @@ class Post(models.Model):
                 raise ValidationError({
                     'published_at': 'Choose a publication time for scheduled posts.',
                 })
+
+        if self.status == self.Status.REJECTED and not self.review_feedback.strip():
+            raise ValidationError({
+                'review_feedback': 'Add feedback when rejecting a post.',
+            })
 
     def save(self, *args, **kwargs):
         changed_fields = set()

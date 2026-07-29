@@ -1,10 +1,205 @@
 from datetime import timedelta
 
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
+from .admin import PostAdminForm
 from .models import Post, PostBlock
+
+
+class PostAdminFormTests(SimpleTestCase):
+    def test_publishing_clears_old_rejection_feedback(self):
+        form = PostAdminForm()
+        form.cleaned_data = {
+            'title': 'Approved post',
+            'status': Post.Status.PUBLISHED,
+            'post_type': Post.PostType.ARTICLE,
+            'review_feedback': 'Old rejection feedback',
+        }
+
+        cleaned_data = form.clean()
+
+        self.assertEqual(cleaned_data['review_feedback'], '')
+
+
+class PostValidationTests(SimpleTestCase):
+    def test_author_edit_returns_published_post_to_review(self):
+        post = Post(
+            title='Published post',
+            status=Post.Status.PUBLISHED,
+        )
+
+        post.apply_author_edit()
+
+        self.assertEqual(post.status, Post.Status.IN_REVIEW)
+
+    def test_author_edit_returns_scheduled_post_to_review(self):
+        post = Post(
+            title='Scheduled post',
+            status=Post.Status.SCHEDULED,
+        )
+
+        post.apply_author_edit()
+
+        self.assertEqual(post.status, Post.Status.IN_REVIEW)
+
+    def test_author_edit_turns_rejected_post_into_draft(self):
+        post = Post(
+            title='Rejected post',
+            status=Post.Status.REJECTED,
+        )
+
+        post.apply_author_edit()
+
+        self.assertEqual(post.status, Post.Status.DRAFT)
+
+    def test_author_edit_does_not_change_other_workflow_statuses(self):
+        unchanged_statuses = (
+            Post.Status.DRAFT,
+            Post.Status.IN_REVIEW,
+            Post.Status.ARCHIVED,
+        )
+
+        for status in unchanged_statuses:
+            with self.subTest(status=status):
+                post = Post(title='Unchanged post', status=status)
+
+                post.apply_author_edit()
+
+                self.assertEqual(post.status, status)
+
+    def test_draft_can_be_submitted_for_review(self):
+        post = Post(
+            title='Draft post',
+            status=Post.Status.DRAFT,
+        )
+
+        post.submit_for_review()
+
+        self.assertEqual(post.status, Post.Status.IN_REVIEW)
+
+    def test_resubmission_clears_old_rejection_feedback(self):
+        post = Post(
+            title='Rejected post',
+            status=Post.Status.REJECTED,
+            review_feedback='Old feedback',
+        )
+
+        post.submit_for_review()
+
+        self.assertEqual(post.status, Post.Status.IN_REVIEW)
+        self.assertEqual(post.review_feedback, '')
+
+    def test_published_post_cannot_be_submitted_for_review(self):
+        post = Post(
+            title='Published post',
+            status=Post.Status.PUBLISHED,
+        )
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            'Only draft or rejected posts can be submitted for review.',
+        ):
+            post.submit_for_review()
+
+    def test_post_in_review_can_be_approved_for_immediate_publication(self):
+        post = Post(
+            title='Reviewed post',
+            status=Post.Status.IN_REVIEW,
+            review_feedback='Old feedback',
+        )
+
+        before_approval = timezone.now()
+        post.approve()
+
+        self.assertEqual(post.status, Post.Status.PUBLISHED)
+        self.assertGreaterEqual(post.published_at, before_approval)
+        self.assertEqual(post.review_feedback, '')
+
+    def test_post_in_review_can_be_approved_for_scheduled_publication(self):
+        publication_time = timezone.now() + timedelta(days=1)
+        post = Post(
+            title='Reviewed post',
+            status=Post.Status.IN_REVIEW,
+        )
+
+        post.approve(publish_at=publication_time)
+
+        self.assertEqual(post.status, Post.Status.SCHEDULED)
+        self.assertEqual(post.published_at, publication_time)
+
+    def test_post_outside_review_cannot_be_approved(self):
+        post = Post(
+            title='Draft post',
+            status=Post.Status.DRAFT,
+        )
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            'Only posts in review can be approved.',
+        ):
+            post.approve()
+
+    def test_post_in_review_can_be_rejected_with_trimmed_feedback(self):
+        post = Post(
+            title='Reviewed post',
+            status=Post.Status.IN_REVIEW,
+        )
+
+        post.reject(feedback='  Improve the introduction.  ')
+
+        self.assertEqual(post.status, Post.Status.REJECTED)
+        self.assertEqual(
+            post.review_feedback,
+            'Improve the introduction.',
+        )
+
+    def test_rejection_requires_feedback(self):
+        post = Post(
+            title='Reviewed post',
+            status=Post.Status.IN_REVIEW,
+        )
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            'Add feedback when rejecting a post.',
+        ):
+            post.reject(feedback='   ')
+
+    def test_post_outside_review_cannot_be_rejected(self):
+        post = Post(
+            title='Draft post',
+            status=Post.Status.DRAFT,
+        )
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            'Only posts in review can be rejected.',
+        ):
+            post.reject(feedback='Needs work.')
+
+    def test_rejected_post_requires_review_feedback(self):
+        post = Post(
+            title='Rejected post',
+            status=Post.Status.REJECTED,
+            review_feedback='   ',
+        )
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            'Add feedback when rejecting a post.',
+        ):
+            post.clean()
+
+    def test_rejected_post_accepts_review_feedback(self):
+        post = Post(
+            title='Rejected post',
+            status=Post.Status.REJECTED,
+            review_feedback='Please improve the introduction.',
+        )
+
+        post.clean()
 
 
 class PostModelTests(TestCase):

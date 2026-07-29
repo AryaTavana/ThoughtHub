@@ -31,6 +31,17 @@ class GroupAdmin(BaseGroupAdmin, ModelAdmin):
 
 
 class PostAdminForm(forms.ModelForm):
+    def clean(self):
+        cleaned_data = super().clean()
+
+        if cleaned_data.get('status') in {
+            Post.Status.PUBLISHED,
+            Post.Status.SCHEDULED,
+        }:
+            cleaned_data['review_feedback'] = ''
+
+        return cleaned_data
+
     class Meta:
         model = Post
         fields = '__all__'
@@ -131,6 +142,7 @@ class PostAdmin(ModelAdmin):
             {
                 'fields': (
                     'status',
+                    'review_feedback',
                     'published_at',
                     'is_featured',
                     'allow_comments',

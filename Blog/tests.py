@@ -6,10 +6,10 @@ from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.test import APITestCase
+from rest_framework.test import APIClient, APITestCase
 
 from .admin import PostAdminForm
-from .models import Post, PostBlock
+from .models import Category, Post, PostBlock, Tag
 
 
 class PostAdminFormTests(SimpleTestCase):
@@ -352,7 +352,7 @@ class PublicPostDetailAPITests(APITestCase):
         )
 
 
-class AuthorPostListAPITests(APITestCase):
+class AuthorPostListCreateAPITests(APITestCase):
     @classmethod
     def setUpTestData(cls):
         user_model = get_user_model()
@@ -385,7 +385,16 @@ class AuthorPostListAPITests(APITestCase):
             author=cls.other_author,
             status=Post.Status.DRAFT,
         )
+        cls.category = Category.objects.create(
+            name='Development',
+            slug='development',
+        )
+        cls.tag = Tag.objects.create(
+            name='Django',
+            slug='django',
+        )
         cls.url = reverse('blog:author-post-list')
+        cls.csrf_url = reverse('account:csrf-token')
 
     def test_anonymous_visitor_cannot_open_author_dashboard(self):
         response = self.client.get(self.url)
@@ -457,6 +466,145 @@ class AuthorPostListAPITests(APITestCase):
         self.assertEqual(len(response.data['results']), 10)
         self.assertIsNotNone(response.data['next'])
         self.assertIsNone(response.data['previous'])
+
+    def test_anonymous_visitor_cannot_create_post(self):
+        response = self.client.post(
+            self.url,
+            {'title': 'Anonymous draft'},
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertFalse(
+            Post.objects.filter(title='Anonymous draft').exists(),
+        )
+
+    def test_author_can_create_draft_with_category_and_tags(self):
+        self.client.force_login(self.author)
+
+        response = self.client.post(
+            self.url,
+            {
+                'title': 'My new API post',
+                'excerpt': 'A short introduction.',
+                'content': 'The complete introduction.',
+                'category': self.category.pk,
+                'tags': [self.tag.pk],
+                'post_type': Post.PostType.TUTORIAL,
+                'allow_comments': False,
+            },
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+        created_post = Post.objects.get(pk=response.data['id'])
+        self.assertEqual(created_post.author, self.author)
+        self.assertEqual(created_post.status, Post.Status.DRAFT)
+        self.assertEqual(created_post.slug, 'my-new-api-post')
+        self.assertEqual(created_post.category, self.category)
+        self.assertEqual(list(created_post.tags.all()), [self.tag])
+        self.assertEqual(
+            created_post.post_type,
+            Post.PostType.TUTORIAL,
+        )
+        self.assertFalse(created_post.allow_comments)
+
+    def test_author_cannot_set_protected_fields_when_creating_post(self):
+        self.client.force_login(self.author)
+
+        response = self.client.post(
+            self.url,
+            {
+                'title': 'Protected fields attempt',
+                'author': self.other_author.pk,
+                'status': Post.Status.PUBLISHED,
+                'review_feedback': 'Fake admin feedback',
+                'published_at': timezone.now().isoformat(),
+                'is_featured': True,
+                'views': 999,
+            },
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+        created_post = Post.objects.get(pk=response.data['id'])
+        self.assertEqual(created_post.author, self.author)
+        self.assertEqual(created_post.status, Post.Status.DRAFT)
+        self.assertEqual(created_post.review_feedback, '')
+        self.assertIsNone(created_post.published_at)
+        self.assertFalse(created_post.is_featured)
+        self.assertEqual(created_post.views, 0)
+
+    def test_invalid_category_and_tag_ids_are_rejected(self):
+        self.client.force_login(self.author)
+
+        response = self.client.post(
+            self.url,
+            {
+                'title': 'Invalid relationships',
+                'category': 999999,
+                'tags': [999999],
+            },
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertIn('category', response.data)
+        self.assertIn('tags', response.data)
+        self.assertFalse(
+            Post.objects.filter(title='Invalid relationships').exists(),
+        )
+
+    def test_authenticated_post_creation_requires_csrf_token(self):
+        csrf_client = APIClient(enforce_csrf_checks=True)
+        csrf_client.force_login(self.author)
+
+        response = csrf_client.post(
+            self.url,
+            {'title': 'Missing CSRF token'},
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertFalse(
+            Post.objects.filter(title='Missing CSRF token').exists(),
+        )
+
+    def test_author_can_create_post_with_valid_csrf_token(self):
+        csrf_client = APIClient(enforce_csrf_checks=True)
+        csrf_client.force_login(self.author)
+        csrf_response = csrf_client.get(self.csrf_url)
+        csrf_token = csrf_response.cookies['csrftoken'].value
+
+        response = csrf_client.post(
+            self.url,
+            {'title': 'CSRF protected draft'},
+            format='json',
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+        created_post = Post.objects.get(pk=response.data['id'])
+        self.assertEqual(created_post.author, self.author)
+        self.assertEqual(created_post.status, Post.Status.DRAFT)
 
 
 class PostModelTests(TestCase):

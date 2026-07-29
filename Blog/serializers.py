@@ -93,3 +93,56 @@ class AuthorPostListSerializer(PublicPostListSerializer):
             'updated_at',
         )
         read_only_fields = fields
+
+
+class AuthorPostWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Post
+        fields = (
+            'id',
+            'title',
+            'slug',
+            'excerpt',
+            'content',
+            'category',
+            'tags',
+            'featured_image',
+            'featured_image_alt',
+            'post_type',
+            'allow_comments',
+            'meta_title',
+            'meta_description',
+            'status',
+            'review_feedback',
+            'published_at',
+            'date_posted',
+            'updated_at',
+        )
+        read_only_fields = (
+            'id',
+            'slug',
+            'status',
+            'review_feedback',
+            'published_at',
+            'date_posted',
+            'updated_at',
+        )
+
+    def validate(self, attrs):
+        featured_image = attrs.get(
+            'featured_image',
+            self.instance.featured_image if self.instance else None,
+        )
+        featured_image_alt = attrs.get(
+            'featured_image_alt',
+            self.instance.featured_image_alt if self.instance else '',
+        )
+
+        if featured_image and not featured_image_alt.strip():
+            raise serializers.ValidationError({
+                'featured_image_alt': (
+                    'Add alternative text when a featured image is used.'
+                ),
+            })
+
+        return attrs

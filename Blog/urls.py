@@ -4,8 +4,10 @@ from .views import (
     AuthorPostDetailView,
     AuthorPostListView,
     AuthorPostSubmitView,
+    CategoryListView,
     PublicPostDetailView,
     PublicPostListView,
+    TagListView,
 )
 
 app_name = 'blog'
@@ -16,6 +18,16 @@ urlpatterns = [
         'posts/<str:slug>/',
         PublicPostDetailView.as_view(),
         name='public-post-detail',
+    ),
+    path(
+        'categories/',
+        CategoryListView.as_view(),
+        name='category-list',
+    ),
+    path(
+        'tags/',
+        TagListView.as_view(),
+        name='tag-list',
     ),
     path('dashboard/posts/', AuthorPostListView.as_view(), name='author-post-list'),
     path(

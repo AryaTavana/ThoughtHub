@@ -11,12 +11,14 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Post
+from .models import Category, Post, Tag
 from .serializers import (
     AuthorPostListSerializer,
     AuthorPostWriteSerializer,
+    CategorySerializer,
     PublicPostDetailSerializer,
     PublicPostListSerializer,
+    TagSerializer,
 )
 
 
@@ -44,6 +46,20 @@ class PublicPostDetailView(RetrieveAPIView):
             .select_related('author', 'category')
             .prefetch_related('tags', 'blocks')
         )
+
+
+class CategoryListView(ListAPIView):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+    permission_classes = (AllowAny,)
+    pagination_class = None
+
+
+class TagListView(ListAPIView):
+    queryset = Tag.objects.all()
+    serializer_class = TagSerializer
+    permission_classes = (AllowAny,)
+    pagination_class = None
 
 
 class AuthorPostListView(ListCreateAPIView):

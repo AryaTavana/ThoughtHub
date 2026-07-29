@@ -206,6 +206,96 @@ class PostValidationTests(SimpleTestCase):
         post.clean()
 
 
+class TaxonomyListAPITests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.backend_category = Category.objects.create(
+            name='Backend',
+            slug='backend',
+        )
+        cls.design_category = Category.objects.create(
+            name='Design',
+            slug='design',
+        )
+        cls.django_tag = Tag.objects.create(
+            name='Django',
+            slug='django',
+        )
+        cls.python_tag = Tag.objects.create(
+            name='Python',
+            slug='python',
+        )
+        cls.category_url = reverse('blog:category-list')
+        cls.tag_url = reverse('blog:tag-list')
+
+    def test_anonymous_visitor_can_list_categories(self):
+        response = self.client.get(self.category_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsInstance(response.data, list)
+        self.assertEqual(
+            response.data,
+            [
+                {
+                    'id': self.backend_category.pk,
+                    'name': 'Backend',
+                    'slug': 'backend',
+                },
+                {
+                    'id': self.design_category.pk,
+                    'name': 'Design',
+                    'slug': 'design',
+                },
+            ],
+        )
+
+    def test_anonymous_visitor_can_list_tags(self):
+        response = self.client.get(self.tag_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsInstance(response.data, list)
+        self.assertEqual(
+            response.data,
+            [
+                {
+                    'id': self.django_tag.pk,
+                    'name': 'Django',
+                    'slug': 'django',
+                },
+                {
+                    'id': self.python_tag.pk,
+                    'name': 'Python',
+                    'slug': 'python',
+                },
+            ],
+        )
+
+    def test_taxonomy_endpoints_are_read_only(self):
+        endpoint_payloads = (
+            (
+                self.category_url,
+                {'name': 'Unauthorized', 'slug': 'unauthorized'},
+            ),
+            (
+                self.tag_url,
+                {'name': 'Unauthorized', 'slug': 'unauthorized'},
+            ),
+        )
+
+        for url, payload in endpoint_payloads:
+            with self.subTest(url=url):
+                response = self.client.post(
+                    url,
+                    payload,
+                    format='json',
+                )
+
+                self.assertEqual(
+                    response.status_code,
+                    status.HTTP_405_METHOD_NOT_ALLOWED,
+                )
+
+
 class PublicPostListAPITests(APITestCase):
     @classmethod
     def setUpTestData(cls):

@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
@@ -349,6 +350,113 @@ class PublicPostDetailAPITests(APITestCase):
             response.status_code,
             status.HTTP_405_METHOD_NOT_ALLOWED,
         )
+
+
+class AuthorPostListAPITests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        user_model = get_user_model()
+        cls.author = user_model.objects.create_user(
+            username='dashboard-author',
+            password='StrongPassword123!',
+        )
+        cls.other_author = user_model.objects.create_user(
+            username='other-author',
+            password='StrongPassword123!',
+        )
+
+        cls.author_posts = {}
+        for post_status in Post.Status.values:
+            post_data = {
+                'title': f'Author {post_status} post',
+                'author': cls.author,
+                'status': post_status,
+            }
+
+            if post_status == Post.Status.SCHEDULED:
+                post_data['published_at'] = timezone.now() + timedelta(days=1)
+            elif post_status == Post.Status.REJECTED:
+                post_data['review_feedback'] = 'Please improve this post.'
+
+            cls.author_posts[post_status] = Post.objects.create(**post_data)
+
+        cls.other_post = Post.objects.create(
+            title='Another author private draft',
+            author=cls.other_author,
+            status=Post.Status.DRAFT,
+        )
+        cls.url = reverse('blog:author-post-list')
+
+    def test_anonymous_visitor_cannot_open_author_dashboard(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_author_sees_their_posts_in_every_workflow_status(self):
+        self.client.force_login(self.author)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], len(Post.Status.values))
+        self.assertEqual(
+            {post_data['status'] for post_data in response.data['results']},
+            set(Post.Status.values),
+        )
+
+        rejected_post_data = next(
+            post_data
+            for post_data in response.data['results']
+            if post_data['status'] == Post.Status.REJECTED
+        )
+        self.assertEqual(
+            rejected_post_data['review_feedback'],
+            'Please improve this post.',
+        )
+
+    def test_author_cannot_see_another_authors_posts(self):
+        self.client.force_login(self.author)
+
+        response = self.client.get(self.url)
+
+        returned_slugs = {
+            post_data['slug']
+            for post_data in response.data['results']
+        }
+        self.assertNotIn(self.other_post.slug, returned_slugs)
+
+    def test_most_recently_updated_post_appears_first(self):
+        oldest_post = self.author_posts[Post.Status.DRAFT]
+        Post.objects.filter(pk=oldest_post.pk).update(
+            updated_at=timezone.now() + timedelta(minutes=1),
+        )
+        self.client.force_login(self.author)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(
+            response.data['results'][0]['slug'],
+            oldest_post.slug,
+        )
+
+    def test_dashboard_post_list_is_paginated(self):
+        for number in range(5):
+            Post.objects.create(
+                title=f'Extra dashboard post {number}',
+                author=self.author,
+            )
+        self.client.force_login(self.author)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 11)
+        self.assertEqual(len(response.data['results']), 10)
+        self.assertIsNotNone(response.data['next'])
+        self.assertIsNone(response.data['previous'])
 
 
 class PostModelTests(TestCase):

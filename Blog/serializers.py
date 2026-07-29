@@ -82,3 +82,14 @@ class PublicPostDetailSerializer(PublicPostListSerializer):
             'updated_at',
         )
         read_only_fields = fields
+
+
+class AuthorPostListSerializer(PublicPostListSerializer):
+    class Meta(PublicPostListSerializer.Meta):
+        fields = PublicPostListSerializer.Meta.fields + (
+            'status',
+            'review_feedback',
+            'date_posted',
+            'updated_at',
+        )
+        read_only_fields = fields

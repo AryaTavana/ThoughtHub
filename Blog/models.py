@@ -396,3 +396,63 @@ class PostBlock(models.Model):
                 name='blog_block_post_position_idx',
             ),
         ]
+
+
+class Comment(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Rejected'
+
+    post = models.ForeignKey(
+        Post,
+        on_delete=models.CASCADE,
+        related_name='comment_entries',
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='comment_entries',
+        null=True,
+    )
+    content = models.TextField(max_length=2000)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    moderation_feedback = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        author_name = self.author.username if self.author else 'Deleted user'
+        return f'{author_name} on {self.post.title}'
+
+    def clean(self):
+        super().clean()
+
+        self.content = self.content.strip()
+        if not self.content:
+            raise ValidationError({
+                'content': 'Comment content cannot be empty.',
+            })
+
+    def approve(self):
+        self.status = self.Status.APPROVED
+        self.moderation_feedback = ''
+
+    def reject(self, *, feedback=''):
+        self.status = self.Status.REJECTED
+        self.moderation_feedback = feedback.strip()
+
+    class Meta:
+        ordering = ('-created_at',)
+        indexes = [
+            models.Index(
+                fields=('post', 'status', 'created_at'),
+                name='blog_comment_post_status_idx',
+            ),
+        ]

@@ -9,7 +9,7 @@ from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
 from .admin import PostAdminForm
-from .models import Category, Post, PostBlock, Tag
+from .models import Category, Comment, Post, PostBlock, Tag
 
 
 class PostAdminFormTests(SimpleTestCase):
@@ -204,6 +204,140 @@ class PostValidationTests(SimpleTestCase):
         )
 
         post.clean()
+
+
+class CommentValidationTests(SimpleTestCase):
+    def test_new_comment_is_pending_by_default(self):
+        comment = Comment(content='A new comment')
+
+        self.assertEqual(comment.status, Comment.Status.PENDING)
+
+    def test_comment_content_is_trimmed_during_validation(self):
+        comment = Comment(content='  Helpful comment.  ')
+
+        comment.clean()
+
+        self.assertEqual(comment.content, 'Helpful comment.')
+
+    def test_whitespace_only_comment_is_rejected(self):
+        comment = Comment(content='   ')
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            'Comment content cannot be empty.',
+        ):
+            comment.clean()
+
+    def test_approving_comment_clears_moderation_feedback(self):
+        comment = Comment(
+            content='Corrected comment',
+            status=Comment.Status.REJECTED,
+            moderation_feedback='Old feedback',
+        )
+
+        comment.approve()
+
+        self.assertEqual(comment.status, Comment.Status.APPROVED)
+        self.assertEqual(comment.moderation_feedback, '')
+
+    def test_rejecting_comment_trims_moderation_feedback(self):
+        comment = Comment(
+            content='Comment requiring moderation',
+            status=Comment.Status.PENDING,
+        )
+
+        comment.reject(feedback='  Please keep the discussion relevant.  ')
+
+        self.assertEqual(comment.status, Comment.Status.REJECTED)
+        self.assertEqual(
+            comment.moderation_feedback,
+            'Please keep the discussion relevant.',
+        )
+
+    def test_deleted_comment_author_has_readable_string(self):
+        comment = Comment(
+            post=Post(title='Readable post'),
+            author=None,
+            content='Preserved comment',
+        )
+
+        self.assertEqual(
+            str(comment),
+            'Deleted user on Readable post',
+        )
+
+
+class CommentModelTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        user_model = get_user_model()
+        cls.author = user_model.objects.create_user(
+            username='comment-author',
+            password='StrongPassword123!',
+        )
+        cls.post = Post.objects.create(
+            title='Post with comments',
+            status=Post.Status.PUBLISHED,
+        )
+        cls.first_comment = Comment.objects.create(
+            post=cls.post,
+            author=cls.author,
+            content='First comment',
+        )
+        cls.second_comment = Comment.objects.create(
+            post=cls.post,
+            author=cls.author,
+            content='Second comment',
+            status=Comment.Status.APPROVED,
+        )
+
+    def test_created_comment_is_pending_in_database(self):
+        self.first_comment.refresh_from_db()
+
+        self.assertEqual(
+            self.first_comment.status,
+            Comment.Status.PENDING,
+        )
+
+    def test_post_reverse_relation_returns_newest_comment_first(self):
+        self.assertEqual(
+            list(self.post.comment_entries.all()),
+            [self.second_comment, self.first_comment],
+        )
+
+    def test_deleting_post_cascades_to_comments(self):
+        post = Post.objects.create(title='Temporary commented post')
+        comment = Comment.objects.create(
+            post=post,
+            author=self.author,
+            content='This will be deleted with the post.',
+        )
+
+        post.delete()
+
+        self.assertFalse(
+            Comment.objects.filter(pk=comment.pk).exists(),
+        )
+
+    def test_deleting_user_preserves_comment_with_null_author(self):
+        user = get_user_model().objects.create_user(
+            username='temporary-commenter',
+            password='StrongPassword123!',
+        )
+        comment = Comment.objects.create(
+            post=self.post,
+            author=user,
+            content='This comment should remain.',
+        )
+
+        user.delete()
+
+        comment.refresh_from_db()
+        self.assertIsNone(comment.author)
+        self.assertEqual(
+            str(comment),
+            'Deleted user on Post with comments',
+        )
 
 
 class TaxonomyListAPITests(APITestCase):

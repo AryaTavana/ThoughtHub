@@ -10,13 +10,16 @@ import './index.css'
 import App from './App.tsx'
 import {initializeTheme} from './theme.ts'
 import {AuthProvider} from './auth/AuthProvider.tsx'
+import {BrowserRouter} from 'react-router-dom'
 
 initializeTheme()
 
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
-        <AuthProvider>
-            <App/>
-        </AuthProvider>
+        <BrowserRouter>
+            <AuthProvider>
+                <App/>
+            </AuthProvider>
+        </BrowserRouter>
     </StrictMode>,
 )

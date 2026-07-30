@@ -6,6 +6,7 @@ import {
 
 import './App.css'
 import {LoginPage} from './pages/LoginPage'
+import {RegistrationPage} from './pages/RegistrationPage'
 
 function HomePage() {
     return (
@@ -18,10 +19,6 @@ function HomePage() {
             </nav>
         </section>
     )
-}
-
-function RegistrationPage() {
-    return <h1>Create account</h1>
 }
 
 function DashboardPage() {

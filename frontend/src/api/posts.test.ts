@@ -8,8 +8,10 @@ import {
 
 import { ApiError, apiRequest } from './client'
 import {
+  getAuthorPosts,
   getPublishedPost,
   getPublishedPosts,
+  type AuthorPostListItem,
   type PaginatedResponse,
   type PublicPostDetail,
   type PublicPostListItem,
@@ -67,6 +69,25 @@ const firstPage: PaginatedResponse<PublicPostListItem> = {
   next: 'http://localhost:8000/api/posts/?page=2',
   previous: null,
   results: [publishedPost],
+}
+
+const authorDraft: AuthorPostListItem = {
+  ...publishedPost,
+  id: 20,
+  title: 'My unfinished article',
+  slug: 'my-unfinished-article',
+  status: 'draft',
+  review_feedback: '',
+  published_at: null,
+  date_posted: '2026-07-29T08:00:00Z',
+  updated_at: '2026-07-30T10:15:00Z',
+}
+
+const authorPostsPage: PaginatedResponse<AuthorPostListItem> = {
+  count: 1,
+  next: null,
+  previous: null,
+  results: [authorDraft],
 }
 
 const publishedPostDetail: PublicPostDetail = {
@@ -250,6 +271,69 @@ describe('published posts API service', () => {
     ).rejects.toBe(error)
     expect(apiRequestMock).toHaveBeenCalledWith(
       '/api/posts/missing-post/',
+    )
+  })
+})
+
+describe('author posts API service', () => {
+  beforeEach(() => {
+    apiRequestMock.mockReset()
+  })
+
+  it('requests the signed-in author post collection', async () => {
+    apiRequestMock.mockResolvedValue(authorPostsPage)
+
+    await expect(getAuthorPosts()).resolves.toEqual(
+      authorPostsPage,
+    )
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/api/dashboard/posts/',
+    )
+  })
+
+  it('adds the requested dashboard page to the URL', async () => {
+    const secondPage = {
+      ...authorPostsPage,
+      previous: 'http://localhost:8000/api/dashboard/posts/',
+    }
+    apiRequestMock.mockResolvedValue(secondPage)
+
+    await expect(
+      getAuthorPosts({ page: 2 }),
+    ).resolves.toEqual(secondPage)
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/api/dashboard/posts/?page=2',
+    )
+  })
+
+  it('preserves draft and editorial workflow fields', async () => {
+    apiRequestMock.mockResolvedValue(authorPostsPage)
+
+    const response = await getAuthorPosts()
+
+    expect(response.results[0]).toMatchObject({
+      id: 20,
+      status: 'draft',
+      review_feedback: '',
+      published_at: null,
+      date_posted: '2026-07-29T08:00:00Z',
+      updated_at: '2026-07-30T10:15:00Z',
+    })
+  })
+
+  it('forwards authentication failures to the dashboard page', async () => {
+    const error = new ApiError(
+      'Authentication credentials were not provided.',
+      403,
+      {
+        detail: 'Authentication credentials were not provided.',
+      },
+    )
+    apiRequestMock.mockRejectedValue(error)
+
+    await expect(getAuthorPosts()).rejects.toBe(error)
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/api/dashboard/posts/',
     )
   })
 })

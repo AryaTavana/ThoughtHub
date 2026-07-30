@@ -9,6 +9,14 @@ export type PostType =
     | 'tutorial'
     | 'opinion'
 
+export type PostStatus =
+    | 'draft'
+    | 'in_review'
+    | 'scheduled'
+    | 'published'
+    | 'rejected'
+    | 'archived'
+
 export type PostBlockType =
     | 'rich_text'
     | 'image'
@@ -47,6 +55,15 @@ export interface PublicPostListItem {
     published_at: string
     reading_time: number
 }
+
+export type AuthorPostListItem =
+    Omit<PublicPostListItem, 'published_at'> & {
+        status: PostStatus
+        review_feedback: string
+        published_at: string | null
+        date_posted: string
+        updated_at: string
+    }
 
 export interface PublicPostBlock {
     id: number
@@ -99,5 +116,28 @@ export function getPublishedPost(
 
     return apiRequest<PublicPostDetail>(
         `/api/posts/${encodedSlug}/`,
+    )
+}
+
+export interface AuthorPostListParameters {
+    page?: number
+}
+
+export function getAuthorPosts(
+    parameters: AuthorPostListParameters = {},
+): Promise<PaginatedResponse<AuthorPostListItem>> {
+    const searchParameters = new URLSearchParams()
+
+    if (parameters.page !== undefined) {
+        searchParameters.set('page', String(parameters.page))
+    }
+
+    const queryString = searchParameters.toString()
+    const path = queryString
+        ? `/api/dashboard/posts/?${queryString}`
+        : '/api/dashboard/posts/'
+
+    return apiRequest<PaginatedResponse<AuthorPostListItem>>(
+        path,
     )
 }

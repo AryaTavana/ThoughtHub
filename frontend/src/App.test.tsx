@@ -15,6 +15,9 @@ import {
 } from './auth/auth-context'
 
 vi.mock('./api/posts', () => ({
+  getAuthorPosts: vi.fn(
+    () => new Promise(() => {}),
+  ),
   getPublishedPost: vi.fn(
     () => new Promise(() => {}),
   ),
@@ -109,7 +112,7 @@ describe('application routes', () => {
       screen.getByRole('heading', { name: 'Log in' }),
     ).toBeInTheDocument()
     expect(
-      screen.queryByRole('heading', { name: 'Dashboard' }),
+      screen.queryByRole('heading', { name: 'Your posts' }),
     ).not.toBeInTheDocument()
   })
 
@@ -120,8 +123,11 @@ describe('application routes', () => {
     })
 
     expect(
-      screen.getByRole('heading', { name: 'Dashboard' }),
+      screen.getByRole('heading', { name: 'Your posts' }),
     ).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Loading your posts…',
+    )
   })
 
   it('renders a fallback page for an unknown route', () => {

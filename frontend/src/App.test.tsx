@@ -7,6 +7,7 @@ import {
   vi,
 } from 'vitest'
 
+import type { CurrentUser } from './api/auth'
 import App from './App'
 import {
   AuthContext,
@@ -23,10 +24,27 @@ const signedOutAuth: AuthContextValue = {
   logout: vi.fn(),
 }
 
-function renderRoute(path: string) {
+const currentUser: CurrentUser = {
+  id: 7,
+  username: 'arya',
+  email: 'arya@example.com',
+  first_name: 'Arya',
+  last_name: 'Tavana',
+  is_staff: false,
+}
+
+function renderRoute(
+  path: string,
+  authOverrides: Partial<AuthContextValue> = {},
+) {
+  const authValue = {
+    ...signedOutAuth,
+    ...authOverrides,
+  }
+
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <AuthContext.Provider value={signedOutAuth}>
+      <AuthContext.Provider value={authValue}>
         <App />
       </AuthContext.Provider>
     </MemoryRouter>,
@@ -54,12 +72,33 @@ describe('application routes', () => {
   it.each([
     ['/login', 'Log in'],
     ['/register', 'Create account'],
-    ['/dashboard', 'Dashboard'],
   ])('renders %s at its matching route', (path, heading) => {
     renderRoute(path)
 
     expect(
       screen.getByRole('heading', { name: heading }),
+    ).toBeInTheDocument()
+  })
+
+  it('redirects a signed-out dashboard visitor to login', () => {
+    renderRoute('/dashboard')
+
+    expect(
+      screen.getByRole('heading', { name: 'Log in' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: 'Dashboard' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('renders the dashboard for an authenticated user', () => {
+    renderRoute('/dashboard', {
+      user: currentUser,
+      isAuthenticated: true,
+    })
+
+    expect(
+      screen.getByRole('heading', { name: 'Dashboard' }),
     ).toBeInTheDocument()
   })
 

@@ -7,6 +7,7 @@ import {
 import './App.css'
 import {LoginPage} from './pages/LoginPage'
 import {RegistrationPage} from './pages/RegistrationPage'
+import {ProtectedRoute} from './auth/ProtectedRoute'
 
 function HomePage() {
     return (
@@ -44,10 +45,12 @@ function App() {
                     path="/register"
                     element={<RegistrationPage/>}
                 />
-                <Route
-                    path="/dashboard"
-                    element={<DashboardPage/>}
-                />
+                <Route element={<ProtectedRoute/>}>
+                    <Route
+                        path="/dashboard"
+                        element={<DashboardPage/>}
+                    />
+                </Route>
                 <Route path="*" element={<NotFoundPage/>}/>
             </Routes>
         </main>

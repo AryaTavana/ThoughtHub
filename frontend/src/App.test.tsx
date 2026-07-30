@@ -4,14 +4,31 @@ import {
   describe,
   expect,
   it,
+  vi,
 } from 'vitest'
 
 import App from './App'
+import {
+  AuthContext,
+  type AuthContextValue,
+} from './auth/auth-context'
+
+const signedOutAuth: AuthContextValue = {
+  user: null,
+  isAuthenticated: false,
+  isInitializing: false,
+  initializationError: null,
+  login: vi.fn(),
+  register: vi.fn(),
+  logout: vi.fn(),
+}
 
 function renderRoute(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <App />
+      <AuthContext.Provider value={signedOutAuth}>
+        <App />
+      </AuthContext.Provider>
     </MemoryRouter>,
   )
 }

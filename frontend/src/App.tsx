@@ -5,6 +5,7 @@ import {
 } from 'react-router-dom'
 
 import './App.css'
+import {LoginPage} from './pages/LoginPage'
 
 function HomePage() {
     return (
@@ -17,10 +18,6 @@ function HomePage() {
             </nav>
         </section>
     )
-}
-
-function LoginPage() {
-    return <h1>Log in</h1>
 }
 
 function RegistrationPage() {

@@ -407,6 +407,10 @@ class PublicPostDetailAPITests(APITestCase):
         )
         self.assertEqual(len(response.data['blocks']), 1)
         self.assertEqual(
+            response.data['blocks'][0]['id'],
+            self.block.pk,
+        )
+        self.assertEqual(
             response.data['blocks'][0]['content'],
             '<p>Public block content</p>',
         )
@@ -1124,6 +1128,373 @@ class AuthorPostSubmitAPITests(APITestCase):
         self.assertEqual(
             response.status_code,
             status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+
+
+class AuthorPostBlockAPITests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        user_model = get_user_model()
+        cls.author = user_model.objects.create_user(
+            username='block-author',
+            password='StrongPassword123!',
+        )
+        cls.other_author = user_model.objects.create_user(
+            username='block-other-author',
+            password='StrongPassword123!',
+        )
+        cls.draft_post = Post.objects.create(
+            title='Block editor draft',
+            author=cls.author,
+            status=Post.Status.DRAFT,
+        )
+        cls.published_post = Post.objects.create(
+            title='Published block editor post',
+            author=cls.author,
+            status=Post.Status.PUBLISHED,
+        )
+        cls.published_delete_post = Post.objects.create(
+            title='Published block delete post',
+            author=cls.author,
+            status=Post.Status.PUBLISHED,
+        )
+        cls.rejected_post = Post.objects.create(
+            title='Rejected block editor post',
+            author=cls.author,
+            status=Post.Status.REJECTED,
+            review_feedback='Add another section.',
+        )
+        cls.other_post = Post.objects.create(
+            title='Other author block post',
+            author=cls.other_author,
+            status=Post.Status.DRAFT,
+        )
+
+        cls.first_block = PostBlock.objects.create(
+            post=cls.draft_post,
+            block_type=PostBlock.BlockType.RICH_TEXT,
+            position=0,
+            content='<p>First block</p>',
+        )
+        cls.last_block = PostBlock.objects.create(
+            post=cls.draft_post,
+            block_type=PostBlock.BlockType.QUOTE,
+            position=2,
+            content='Last block',
+            quote_attribution='Author',
+        )
+        cls.published_block = PostBlock.objects.create(
+            post=cls.published_post,
+            block_type=PostBlock.BlockType.RICH_TEXT,
+            position=0,
+            content='Published block',
+        )
+        cls.published_delete_block = PostBlock.objects.create(
+            post=cls.published_delete_post,
+            block_type=PostBlock.BlockType.RICH_TEXT,
+            position=0,
+            content='Published block to delete',
+        )
+        cls.other_block = PostBlock.objects.create(
+            post=cls.other_post,
+            block_type=PostBlock.BlockType.RICH_TEXT,
+            position=0,
+            content='Other author block',
+        )
+
+    @staticmethod
+    def block_list_url(post):
+        return reverse(
+            'blog:author-post-block-list',
+            kwargs={'post_pk': post.pk},
+        )
+
+    @staticmethod
+    def block_detail_url(post, block):
+        return reverse(
+            'blog:author-post-block-detail',
+            kwargs={
+                'post_pk': post.pk,
+                'pk': block.pk,
+            },
+        )
+
+    def test_anonymous_visitor_cannot_list_private_blocks(self):
+        response = self.client.get(self.block_list_url(self.draft_post))
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_author_can_list_owned_post_blocks_in_position_order(self):
+        self.client.force_login(self.author)
+
+        response = self.client.get(self.block_list_url(self.draft_post))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsInstance(response.data, list)
+        self.assertEqual(
+            [block_data['id'] for block_data in response.data],
+            [self.first_block.pk, self.last_block.pk],
+        )
+
+    def test_other_author_cannot_list_post_blocks(self):
+        self.client.force_login(self.other_author)
+
+        response = self.client.get(self.block_list_url(self.draft_post))
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    def test_author_can_create_block_and_cannot_forge_parent_post(self):
+        self.client.force_login(self.author)
+
+        response = self.client.post(
+            self.block_list_url(self.draft_post),
+            {
+                'post': self.other_post.pk,
+                'block_type': PostBlock.BlockType.RICH_TEXT,
+                'position': 1,
+                'content': '<p>New middle block</p>',
+            },
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+        block = PostBlock.objects.get(pk=response.data['id'])
+        self.assertEqual(block.post, self.draft_post)
+        self.assertEqual(block.position, 1)
+        self.assertEqual(block.content, '<p>New middle block</p>')
+
+    def test_required_data_is_validated_for_each_content_block_type(self):
+        self.client.force_login(self.author)
+        invalid_blocks = (
+            (
+                {'block_type': PostBlock.BlockType.RICH_TEXT},
+                'content',
+            ),
+            (
+                {'block_type': PostBlock.BlockType.QUOTE},
+                'content',
+            ),
+            (
+                {'block_type': PostBlock.BlockType.IMAGE},
+                'image',
+            ),
+            (
+                {'block_type': PostBlock.BlockType.VIDEO},
+                'video_url',
+            ),
+        )
+
+        for payload, expected_error_field in invalid_blocks:
+            with self.subTest(block_type=payload['block_type']):
+                response = self.client.post(
+                    self.block_list_url(self.draft_post),
+                    payload,
+                    format='json',
+                )
+
+                self.assertEqual(
+                    response.status_code,
+                    status.HTTP_400_BAD_REQUEST,
+                )
+                self.assertIn(expected_error_field, response.data)
+
+    def test_divider_block_does_not_require_content(self):
+        self.client.force_login(self.author)
+
+        response = self.client.post(
+            self.block_list_url(self.draft_post),
+            {
+                'block_type': PostBlock.BlockType.DIVIDER,
+                'position': 1,
+            },
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+        block = PostBlock.objects.get(pk=response.data['id'])
+        self.assertEqual(block.block_type, PostBlock.BlockType.DIVIDER)
+        self.assertEqual(block.content, '')
+
+    def test_author_can_update_and_reorder_owned_block(self):
+        self.client.force_login(self.author)
+
+        response = self.client.patch(
+            self.block_detail_url(self.draft_post, self.last_block),
+            {
+                'position': 1,
+                'content': 'Updated quote',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.last_block.refresh_from_db()
+        self.assertEqual(self.last_block.position, 1)
+        self.assertEqual(self.last_block.content, 'Updated quote')
+
+    def test_changing_block_type_requires_new_types_data(self):
+        self.client.force_login(self.author)
+
+        response = self.client.patch(
+            self.block_detail_url(self.draft_post, self.first_block),
+            {'block_type': PostBlock.BlockType.VIDEO},
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertIn('video_url', response.data)
+        self.first_block.refresh_from_db()
+        self.assertEqual(
+            self.first_block.block_type,
+            PostBlock.BlockType.RICH_TEXT,
+        )
+
+    def test_other_author_cannot_manage_block(self):
+        self.client.force_login(self.other_author)
+        url = self.block_detail_url(self.draft_post, self.first_block)
+
+        retrieve_response = self.client.get(url)
+        update_response = self.client.patch(
+            url,
+            {'content': 'Unauthorized edit'},
+            format='json',
+        )
+        delete_response = self.client.delete(url)
+
+        for response in (
+            retrieve_response,
+            update_response,
+            delete_response,
+        ):
+            self.assertEqual(
+                response.status_code,
+                status.HTTP_404_NOT_FOUND,
+            )
+
+        self.assertTrue(
+            PostBlock.objects.filter(pk=self.first_block.pk).exists(),
+        )
+
+    def test_block_must_belong_to_post_in_url(self):
+        self.client.force_login(self.author)
+
+        response = self.client.get(
+            self.block_detail_url(
+                self.published_post,
+                self.first_block,
+            ),
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+    def test_editing_published_post_block_returns_post_to_review(self):
+        self.published_post.refresh_from_db()
+        self.client.force_login(self.author)
+
+        response = self.client.patch(
+            self.block_detail_url(
+                self.published_post,
+                self.published_block,
+            ),
+            {'content': 'Edited published block'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.published_post.refresh_from_db()
+        self.assertEqual(
+            self.published_post.status,
+            Post.Status.IN_REVIEW,
+        )
+        self.assertFalse(self.published_post.is_public)
+
+    def test_adding_block_to_rejected_post_returns_post_to_draft(self):
+        self.rejected_post.refresh_from_db()
+        self.client.force_login(self.author)
+
+        response = self.client.post(
+            self.block_list_url(self.rejected_post),
+            {
+                'block_type': PostBlock.BlockType.RICH_TEXT,
+                'content': 'A new section',
+            },
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+        self.rejected_post.refresh_from_db()
+        self.assertEqual(
+            self.rejected_post.status,
+            Post.Status.DRAFT,
+        )
+        self.assertEqual(
+            self.rejected_post.review_feedback,
+            'Add another section.',
+        )
+
+    def test_deleting_published_block_returns_post_to_review(self):
+        self.published_delete_post.refresh_from_db()
+        self.client.force_login(self.author)
+
+        response = self.client.delete(
+            self.block_detail_url(
+                self.published_delete_post,
+                self.published_delete_block,
+            ),
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_204_NO_CONTENT,
+        )
+        self.assertFalse(
+            PostBlock.objects.filter(
+                pk=self.published_delete_block.pk,
+            ).exists(),
+        )
+        self.published_delete_post.refresh_from_db()
+        self.assertEqual(
+            self.published_delete_post.status,
+            Post.Status.IN_REVIEW,
+        )
+
+    def test_block_creation_requires_csrf_token(self):
+        csrf_client = APIClient(enforce_csrf_checks=True)
+        csrf_client.force_login(self.author)
+
+        response = csrf_client.post(
+            self.block_list_url(self.draft_post),
+            {
+                'block_type': PostBlock.BlockType.RICH_TEXT,
+                'content': 'Missing CSRF token',
+            },
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
         )
 
 

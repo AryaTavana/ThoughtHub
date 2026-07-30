@@ -29,6 +29,7 @@ class PostBlockSerializer(serializers.ModelSerializer):
     class Meta:
         model = PostBlock
         fields = (
+            'id',
             'block_type',
             'position',
             'content',
@@ -40,6 +41,84 @@ class PostBlockSerializer(serializers.ModelSerializer):
             'quote_attribution',
         )
         read_only_fields = fields
+
+
+class AuthorPostBlockSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PostBlock
+        fields = (
+            'id',
+            'block_type',
+            'position',
+            'content',
+            'image',
+            'image_alt',
+            'caption',
+            'image_width',
+            'video_url',
+            'quote_attribution',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = (
+            'id',
+            'created_at',
+            'updated_at',
+        )
+
+    def validate(self, attrs):
+        block_type = attrs.get(
+            'block_type',
+            (
+                self.instance.block_type
+                if self.instance
+                else PostBlock.BlockType.RICH_TEXT
+            ),
+        )
+        content = attrs.get(
+            'content',
+            self.instance.content if self.instance else '',
+        )
+        image = attrs.get(
+            'image',
+            self.instance.image if self.instance else None,
+        )
+        image_alt = attrs.get(
+            'image_alt',
+            self.instance.image_alt if self.instance else '',
+        )
+        video_url = attrs.get(
+            'video_url',
+            self.instance.video_url if self.instance else '',
+        )
+
+        errors = {}
+
+        if (
+            block_type
+            in {
+                PostBlock.BlockType.RICH_TEXT,
+                PostBlock.BlockType.QUOTE,
+            }
+            and not content.strip()
+        ):
+            errors['content'] = 'Add content for this block type.'
+
+        if block_type == PostBlock.BlockType.IMAGE:
+            if not image:
+                errors['image'] = 'Choose an image for this block.'
+            if not image_alt.strip():
+                errors['image_alt'] = (
+                    'Describe the image for accessibility.'
+                )
+
+        if block_type == PostBlock.BlockType.VIDEO and not video_url:
+            errors['video_url'] = 'Add a URL for this video block.'
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        return attrs
 
 
 class PublicPostListSerializer(serializers.ModelSerializer):

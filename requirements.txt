@@ -1,9 +1,14 @@
 asgiref==3.12.1
 Django==6.0.7
+django-stubs==6.0.7
+django-stubs-ext==6.0.7
 django-unfold==0.102.0
 djangorestframework==3.17.1
+djangorestframework-stubs==3.17.1
 pillow==12.3.0
 psycopg==3.3.4
 psycopg-binary==3.3.4
 python-dotenv==1.2.2
 sqlparse==0.5.5
+types-PyYAML==6.0.12.20260724
+typing_extensions==4.16.0

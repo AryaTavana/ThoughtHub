@@ -1,6 +1,8 @@
 from django.urls import path
 
 from .views import (
+    AuthorPostBlockDetailView,
+    AuthorPostBlockListCreateView,
     AuthorPostDetailView,
     AuthorPostListView,
     AuthorPostSubmitView,
@@ -39,5 +41,15 @@ urlpatterns = [
         'dashboard/posts/<int:pk>/submit/',
         AuthorPostSubmitView.as_view(),
         name='author-post-submit',
+    ),
+    path(
+        'dashboard/posts/<int:post_pk>/blocks/',
+        AuthorPostBlockListCreateView.as_view(),
+        name='author-post-block-list',
+    ),
+    path(
+        'dashboard/posts/<int:post_pk>/blocks/<int:pk>/',
+        AuthorPostBlockDetailView.as_view(),
+        name='author-post-block-detail',
     ),
 ]

@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework.generics import (
     ListAPIView,
@@ -11,15 +12,21 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Category, Post, Tag
+from .models import Category, Post, PostBlock, Tag
 from .serializers import (
     AuthorPostListSerializer,
+    AuthorPostBlockSerializer,
     AuthorPostWriteSerializer,
     CategorySerializer,
     PublicPostDetailSerializer,
     PublicPostListSerializer,
     TagSerializer,
 )
+
+
+def _mark_post_as_edited(post):
+    post.apply_author_edit()
+    post.save(update_fields=('status', 'updated_at'))
 
 
 # Create your views here.
@@ -105,6 +112,65 @@ class AuthorPostDetailView(RetrieveUpdateDestroyAPIView):
             post.apply_author_edit()
 
         serializer.save()
+
+
+class AuthorPostBlockListCreateView(ListCreateAPIView):
+    serializer_class = AuthorPostBlockSerializer
+    permission_classes = (IsAuthenticated,)
+    pagination_class = None
+
+    def get_post(self):
+        if not hasattr(self, '_post'):
+            self._post = get_object_or_404(
+                Post,
+                pk=self.kwargs['post_pk'],
+                author=self.request.user,
+            )
+
+        return self._post
+
+    def get_queryset(self):
+        return (
+            PostBlock.objects.filter(post=self.get_post())
+            .select_related('post')
+        )
+
+    def perform_create(self, serializer):
+        post = self.get_post()
+
+        with transaction.atomic():
+            serializer.save(post=post)
+            _mark_post_as_edited(post)
+
+
+class AuthorPostBlockDetailView(RetrieveUpdateDestroyAPIView):
+    serializer_class = AuthorPostBlockSerializer
+    permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        return (
+            PostBlock.objects.filter(
+                post_id=self.kwargs['post_pk'],
+                post__author=self.request.user,
+            )
+            .select_related('post')
+        )
+
+    def perform_update(self, serializer):
+        has_changes = bool(serializer.validated_data)
+
+        with transaction.atomic():
+            block = serializer.save()
+
+            if has_changes:
+                _mark_post_as_edited(block.post)
+
+    def perform_destroy(self, instance):
+        post = instance.post
+
+        with transaction.atomic():
+            instance.delete()
+            _mark_post_as_edited(post)
 
 
 class AuthorPostSubmitView(APIView):

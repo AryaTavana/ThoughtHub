@@ -1,4 +1,7 @@
 import {apiRequest} from './client'
+import type {PaginatedResponse} from './pagination'
+
+export type {PaginatedResponse} from './pagination'
 
 export type PostType =
     | 'article'
@@ -66,13 +69,6 @@ export interface PublicPostDetail
     meta_title: string
     meta_description: string
     updated_at: string
-}
-
-export interface PaginatedResponse<T> {
-    count: number
-    next: string | null
-    previous: string | null
-    results: T[]
 }
 
 export interface PublishedPostListParameters {

@@ -9,9 +9,11 @@ import {
 } from '../api/comments'
 import {getApiErrorMessage} from '../api/errors'
 import type {PaginatedResponse} from '../api/pagination'
+import {PostCommentForm} from './PostCommentForm'
 
 interface PostCommentsSectionProps {
     slug: string
+    allowComments: boolean
 }
 
 const commentDateFormatter = new Intl.DateTimeFormat(
@@ -34,6 +36,7 @@ function formatCommentDate(value: string): string {
 
 export function PostCommentsSection({
     slug,
+    allowComments,
 }: PostCommentsSectionProps) {
     const [commentsPage, setCommentsPage] =
         useState<PaginatedResponse<PublicComment> | null>(null)
@@ -105,6 +108,11 @@ export function PostCommentsSection({
                     </span>
                 )}
             </div>
+
+            <PostCommentForm
+                slug={slug}
+                allowComments={allowComments}
+            />
 
             {isLoading && (
                 <div

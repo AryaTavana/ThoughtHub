@@ -27,6 +27,20 @@ vi.mock('../api/comments', () => ({
   getPostComments: vi.fn(),
 }))
 
+vi.mock('./PostCommentForm', () => ({
+  PostCommentForm: ({
+    slug,
+    allowComments,
+  }: {
+    slug: string
+    allowComments: boolean
+  }) => (
+    <div data-testid="comment-form-props">
+      {slug}:{String(allowComments)}
+    </div>
+  ),
+}))
+
 const getPostCommentsMock = vi.mocked(getPostComments)
 
 const firstComment: PublicComment = {
@@ -76,7 +90,12 @@ describe('PostCommentsSection', () => {
       new Promise(() => {}),
     )
 
-    render(<PostCommentsSection slug="example" />)
+    render(
+      <PostCommentsSection
+        slug="example"
+        allowComments={false}
+      />,
+    )
 
     expect(screen.getByRole('status')).toHaveTextContent(
       'Loading comments…',
@@ -85,6 +104,9 @@ describe('PostCommentsSection', () => {
       'example',
       { page: 1 },
     )
+    expect(
+      screen.getByTestId('comment-form-props'),
+    ).toHaveTextContent('example:false')
   })
 
   it('renders approved comments, counts, authors, and dates safely', async () => {
@@ -101,7 +123,10 @@ describe('PostCommentsSection', () => {
       ],
     })
     const { container } = render(
-      <PostCommentsSection slug="example" />,
+      <PostCommentsSection
+        slug="example"
+        allowComments
+      />,
     )
 
     expect(
@@ -132,7 +157,12 @@ describe('PostCommentsSection', () => {
   })
 
   it('renders an empty state when no comments are approved', async () => {
-    render(<PostCommentsSection slug="example" />)
+    render(
+      <PostCommentsSection
+        slug="example"
+        allowComments
+      />,
+    )
 
     expect(
       await screen.findByText('No approved comments yet.'),
@@ -152,7 +182,12 @@ describe('PostCommentsSection', () => {
       .mockResolvedValueOnce(emptyPage)
     const user = userEvent.setup()
 
-    render(<PostCommentsSection slug="example" />)
+    render(
+      <PostCommentsSection
+        slug="example"
+        allowComments
+      />,
+    )
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Unable to reach Django.',
@@ -177,7 +212,12 @@ describe('PostCommentsSection', () => {
     )
     const user = userEvent.setup()
 
-    render(<PostCommentsSection slug="example" />)
+    render(
+      <PostCommentsSection
+        slug="example"
+        allowComments
+      />,
+    )
 
     expect(
       await screen.findByText(
@@ -244,7 +284,10 @@ describe('PostCommentsSection', () => {
 
     render(
       <StrictMode>
-        <PostCommentsSection slug="example" />
+        <PostCommentsSection
+          slug="example"
+          allowComments
+        />
       </StrictMode>,
     )
 

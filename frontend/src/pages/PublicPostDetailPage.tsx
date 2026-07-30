@@ -281,21 +281,14 @@ export function PublicPostDetailPage() {
                                     )}
                                 </time>
                             </p>
-
-                            {!post.allow_comments && (
-                                <div
-                                    className="alert alert-secondary"
-                                    role="status"
-                                >
-                                    Comments are closed for this
-                                    post.
-                                </div>
-                            )}
                         </footer>
 
                         <PostCommentsSection
                             key={post.slug}
                             slug={post.slug}
+                            allowComments={
+                                post.allow_comments
+                            }
                         />
                     </article>
                 )}

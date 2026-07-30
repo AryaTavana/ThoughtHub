@@ -6,6 +6,18 @@ export type PostType =
     | 'tutorial'
     | 'opinion'
 
+export type PostBlockType =
+    | 'rich_text'
+    | 'image'
+    | 'video'
+    | 'quote'
+    | 'divider'
+
+export type ImageWidth =
+    | 'content'
+    | 'wide'
+    | 'full'
+
 export interface Category {
     id: number
     name: string
@@ -31,6 +43,29 @@ export interface PublicPostListItem {
     post_type: PostType
     published_at: string
     reading_time: number
+}
+
+export interface PublicPostBlock {
+    id: number
+    block_type: PostBlockType
+    position: number
+    content: string
+    image: string | null
+    image_alt: string
+    caption: string
+    image_width: ImageWidth
+    video_url: string
+    quote_attribution: string
+}
+
+export interface PublicPostDetail
+    extends PublicPostListItem {
+    content: string
+    blocks: PublicPostBlock[]
+    allow_comments: boolean
+    meta_title: string
+    meta_description: string
+    updated_at: string
 }
 
 export interface PaginatedResponse<T> {
@@ -59,4 +94,14 @@ export function getPublishedPosts(
         : '/api/posts/'
 
     return apiRequest<PaginatedResponse<PublicPostListItem>>(path)
+}
+
+export function getPublishedPost(
+    slug: string,
+): Promise<PublicPostDetail> {
+    const encodedSlug = encodeURIComponent(slug)
+
+    return apiRequest<PublicPostDetail>(
+        `/api/posts/${encodedSlug}/`,
+    )
 }

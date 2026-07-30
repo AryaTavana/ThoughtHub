@@ -7,6 +7,7 @@ from .views import (
     AuthorPostListView,
     AuthorPostSubmitView,
     CategoryListView,
+    PublicPostCommentListCreateView,
     PublicPostDetailView,
     PublicPostListView,
     TagListView,
@@ -16,6 +17,11 @@ app_name = 'blog'
 
 urlpatterns = [
     path('posts/', PublicPostListView.as_view(), name='public-post-list'),
+    path(
+        'posts/<str:slug>/comments/',
+        PublicPostCommentListCreateView.as_view(),
+        name='public-post-comment-list',
+    ),
     path(
         'posts/<str:slug>/',
         PublicPostDetailView.as_view(),

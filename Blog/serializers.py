@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Category, Post, PostBlock, Tag
+from .models import Category, Comment, Post, PostBlock, Tag
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -119,6 +119,65 @@ class AuthorPostBlockSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(errors)
 
         return attrs
+
+
+class PublicCommentSerializer(serializers.ModelSerializer):
+    author_username = serializers.CharField(
+        source='author.username',
+        read_only=True,
+        default='Deleted user',
+    )
+
+    class Meta:
+        model = Comment
+        fields = (
+            'id',
+            'author_username',
+            'content',
+            'created_at',
+        )
+        read_only_fields = fields
+
+
+class CommentCreateSerializer(serializers.ModelSerializer):
+    author_username = serializers.CharField(
+        source='author.username',
+        read_only=True,
+        default='Deleted user',
+    )
+    content = serializers.CharField(
+        max_length=2000,
+        allow_blank=True,
+        trim_whitespace=False,
+    )
+
+    class Meta:
+        model = Comment
+        fields = (
+            'id',
+            'author_username',
+            'content',
+            'status',
+            'moderation_feedback',
+            'created_at',
+        )
+        read_only_fields = (
+            'id',
+            'author_username',
+            'status',
+            'moderation_feedback',
+            'created_at',
+        )
+
+    def validate_content(self, value):
+        value = value.strip()
+
+        if not value:
+            raise serializers.ValidationError(
+                'Comment content cannot be empty.',
+            )
+
+        return value
 
 
 class PublicPostListSerializer(serializers.ModelSerializer):

@@ -701,6 +701,352 @@ class PublicPostDetailAPITests(APITestCase):
         )
 
 
+class PublicPostCommentListCreateAPITests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        user_model = get_user_model()
+        cls.commenter = user_model.objects.create_user(
+            username='public-commenter',
+            password='StrongPassword123!',
+        )
+        cls.other_user = user_model.objects.create_user(
+            username='other-commenter',
+            password='StrongPassword123!',
+        )
+        deleted_user = user_model.objects.create_user(
+            username='deleted-commenter',
+            password='StrongPassword123!',
+        )
+
+        cls.public_post = Post.objects.create(
+            title='Public commented post',
+            status=Post.Status.PUBLISHED,
+            allow_comments=True,
+        )
+        cls.closed_post = Post.objects.create(
+            title='Closed comments post',
+            status=Post.Status.PUBLISHED,
+            allow_comments=False,
+        )
+        cls.draft_post = Post.objects.create(
+            title='Private commented draft',
+            status=Post.Status.DRAFT,
+        )
+        cls.future_post = Post.objects.create(
+            title='Future commented post',
+            status=Post.Status.SCHEDULED,
+            published_at=timezone.now() + timedelta(days=1),
+        )
+        cls.due_scheduled_post = Post.objects.create(
+            title='Due scheduled commented post',
+            status=Post.Status.SCHEDULED,
+            published_at=timezone.now() - timedelta(minutes=1),
+        )
+
+        cls.approved_comment = Comment.objects.create(
+            post=cls.public_post,
+            author=cls.commenter,
+            content='Visible approved comment',
+            status=Comment.Status.APPROVED,
+        )
+        cls.pending_comment = Comment.objects.create(
+            post=cls.public_post,
+            author=cls.commenter,
+            content='Hidden pending comment',
+            status=Comment.Status.PENDING,
+        )
+        cls.rejected_comment = Comment.objects.create(
+            post=cls.public_post,
+            author=cls.commenter,
+            content='Hidden rejected comment',
+            status=Comment.Status.REJECTED,
+            moderation_feedback='Not suitable.',
+        )
+        cls.deleted_author_comment = Comment.objects.create(
+            post=cls.public_post,
+            author=deleted_user,
+            content='Visible preserved comment',
+            status=Comment.Status.APPROVED,
+        )
+        deleted_user.delete()
+
+        cls.closed_post_comment = Comment.objects.create(
+            post=cls.closed_post,
+            author=cls.commenter,
+            content='Visible comment on closed post',
+            status=Comment.Status.APPROVED,
+        )
+        cls.due_scheduled_comment = Comment.objects.create(
+            post=cls.due_scheduled_post,
+            author=cls.commenter,
+            content='Visible scheduled comment',
+            status=Comment.Status.APPROVED,
+        )
+        Post.objects.filter(pk=cls.public_post.pk).update(comments=2)
+
+    @staticmethod
+    def comments_url(post):
+        return reverse(
+            'blog:public-post-comment-list',
+            kwargs={'slug': post.slug},
+        )
+
+    def test_anonymous_visitor_sees_only_approved_comments(self):
+        response = self.client.get(self.comments_url(self.public_post))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 2)
+        self.assertEqual(
+            [
+                comment_data['id']
+                for comment_data in response.data['results']
+            ],
+            [
+                self.deleted_author_comment.pk,
+                self.approved_comment.pk,
+            ],
+        )
+        returned_ids = {
+            comment_data['id']
+            for comment_data in response.data['results']
+        }
+        self.assertNotIn(self.pending_comment.pk, returned_ids)
+        self.assertNotIn(self.rejected_comment.pk, returned_ids)
+
+        for comment_data in response.data['results']:
+            self.assertNotIn('status', comment_data)
+            self.assertNotIn('moderation_feedback', comment_data)
+
+    def test_deleted_comment_author_has_public_fallback_name(self):
+        response = self.client.get(self.comments_url(self.public_post))
+
+        deleted_author_data = next(
+            comment_data
+            for comment_data in response.data['results']
+            if comment_data['id'] == self.deleted_author_comment.pk
+        )
+        self.assertEqual(
+            deleted_author_data['author_username'],
+            'Deleted user',
+        )
+
+    def test_closed_comments_remain_publicly_visible(self):
+        response = self.client.get(self.comments_url(self.closed_post))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(
+            response.data['results'][0]['id'],
+            self.closed_post_comment.pk,
+        )
+
+    def test_due_scheduled_post_comments_are_public(self):
+        response = self.client.get(
+            self.comments_url(self.due_scheduled_post),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(
+            response.data['results'][0]['id'],
+            self.due_scheduled_comment.pk,
+        )
+
+    def test_non_public_post_comments_return_not_found(self):
+        for post in (self.draft_post, self.future_post):
+            with self.subTest(post_status=post.status):
+                response = self.client.get(self.comments_url(post))
+
+                self.assertEqual(
+                    response.status_code,
+                    status.HTTP_404_NOT_FOUND,
+                )
+
+    def test_anonymous_visitor_cannot_submit_comment(self):
+        response = self.client.post(
+            self.comments_url(self.public_post),
+            {'content': 'Anonymous comment'},
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertFalse(
+            Comment.objects.filter(content='Anonymous comment').exists(),
+        )
+
+    def test_authenticated_user_can_submit_trimmed_pending_comment(self):
+        self.client.force_login(self.commenter)
+
+        response = self.client.post(
+            self.comments_url(self.public_post),
+            {'content': '  A thoughtful response.  '},
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+        comment = Comment.objects.get(pk=response.data['id'])
+        self.assertEqual(comment.post, self.public_post)
+        self.assertEqual(comment.author, self.commenter)
+        self.assertEqual(comment.content, 'A thoughtful response.')
+        self.assertEqual(comment.status, Comment.Status.PENDING)
+        self.assertEqual(
+            response.data['author_username'],
+            self.commenter.username,
+        )
+        self.assertEqual(
+            response.data['status'],
+            Comment.Status.PENDING,
+        )
+        self.public_post.refresh_from_db()
+        self.assertEqual(self.public_post.comments, 2)
+
+    def test_user_cannot_forge_comment_ownership_or_moderation(self):
+        self.client.force_login(self.commenter)
+
+        response = self.client.post(
+            self.comments_url(self.public_post),
+            {
+                'content': 'Protected comment fields',
+                'post': self.closed_post.pk,
+                'author': self.other_user.pk,
+                'status': Comment.Status.APPROVED,
+                'moderation_feedback': 'Fake feedback',
+            },
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+        comment = Comment.objects.get(pk=response.data['id'])
+        self.assertEqual(comment.post, self.public_post)
+        self.assertEqual(comment.author, self.commenter)
+        self.assertEqual(comment.status, Comment.Status.PENDING)
+        self.assertEqual(comment.moderation_feedback, '')
+
+    def test_user_cannot_submit_comment_when_comments_are_closed(self):
+        self.client.force_login(self.commenter)
+
+        response = self.client.post(
+            self.comments_url(self.closed_post),
+            {'content': 'Comment on closed post'},
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(
+            str(response.data['detail']),
+            'Comments are closed for this post.',
+        )
+
+    def test_user_cannot_submit_comment_to_non_public_post(self):
+        self.client.force_login(self.commenter)
+
+        for post in (self.draft_post, self.future_post):
+            with self.subTest(post_status=post.status):
+                response = self.client.post(
+                    self.comments_url(post),
+                    {'content': 'Comment on private post'},
+                    format='json',
+                )
+
+                self.assertEqual(
+                    response.status_code,
+                    status.HTTP_404_NOT_FOUND,
+                )
+
+    def test_whitespace_only_comment_is_rejected_by_api(self):
+        self.client.force_login(self.commenter)
+
+        response = self.client.post(
+            self.comments_url(self.public_post),
+            {'content': '   '},
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertEqual(
+            str(response.data['content'][0]),
+            'Comment content cannot be empty.',
+        )
+
+    def test_comment_content_cannot_exceed_maximum_length(self):
+        self.client.force_login(self.commenter)
+
+        response = self.client.post(
+            self.comments_url(self.public_post),
+            {'content': 'a' * 2001},
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertIn('content', response.data)
+
+    def test_comment_submission_requires_csrf_token(self):
+        csrf_client = APIClient(enforce_csrf_checks=True)
+        csrf_client.force_login(self.commenter)
+
+        response = csrf_client.post(
+            self.comments_url(self.public_post),
+            {'content': 'Missing CSRF token'},
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_public_comment_list_is_paginated(self):
+        for number in range(9):
+            Comment.objects.create(
+                post=self.public_post,
+                author=self.commenter,
+                content=f'Extra approved comment {number}',
+                status=Comment.Status.APPROVED,
+            )
+
+        response = self.client.get(self.comments_url(self.public_post))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 11)
+        self.assertEqual(len(response.data['results']), 10)
+        self.assertIsNotNone(response.data['next'])
+        self.assertIsNone(response.data['previous'])
+
+    def test_update_and_delete_methods_are_not_allowed(self):
+        url = self.comments_url(self.public_post)
+
+        for method in ('patch', 'delete'):
+            with self.subTest(method=method):
+                response = getattr(self.client, method)(
+                    url,
+                    {'content': 'Not allowed'},
+                    format='json',
+                )
+
+                self.assertEqual(
+                    response.status_code,
+                    status.HTTP_405_METHOD_NOT_ALLOWED,
+                )
+
+
 class AuthorPostListCreateAPITests(APITestCase):
     @classmethod
     def setUpTestData(cls):

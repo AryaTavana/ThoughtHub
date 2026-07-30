@@ -7,17 +7,22 @@ from rest_framework.generics import (
     RetrieveAPIView,
     RetrieveUpdateDestroyAPIView,
 )
-from rest_framework.exceptions import ValidationError as APIValidationError
+from rest_framework.exceptions import (
+    PermissionDenied,
+    ValidationError as APIValidationError,
+)
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Category, Post, PostBlock, Tag
+from .models import Category, Comment, Post, PostBlock, Tag
 from .serializers import (
-    AuthorPostListSerializer,
     AuthorPostBlockSerializer,
+    AuthorPostListSerializer,
     AuthorPostWriteSerializer,
     CategorySerializer,
+    CommentCreateSerializer,
+    PublicCommentSerializer,
     PublicPostDetailSerializer,
     PublicPostListSerializer,
     TagSerializer,
@@ -39,6 +44,54 @@ class PublicPostListView(ListAPIView):
             Post.objects.published()
             .select_related("author", "category")
             .prefetch_related("tags", "blocks")
+        )
+
+
+class PublicPostCommentListCreateView(ListCreateAPIView):
+    permission_classes = (AllowAny,)
+
+    def get_post(self):
+        if not hasattr(self, '_post'):
+            self._post = get_object_or_404(
+                Post.objects.published(),
+                slug=self.kwargs['slug'],
+            )
+
+        return self._post
+
+    def get_queryset(self):
+        return (
+            Comment.objects.filter(
+                post=self.get_post(),
+                status=Comment.Status.APPROVED,
+            )
+            .select_related('author')
+        )
+
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return CommentCreateSerializer
+
+        return PublicCommentSerializer
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return (IsAuthenticated(),)
+
+        return (AllowAny(),)
+
+    def perform_create(self, serializer):
+        post = self.get_post()
+
+        if not post.allow_comments:
+            raise PermissionDenied(
+                'Comments are closed for this post.',
+            )
+
+        serializer.save(
+            post=post,
+            author=self.request.user,
+            status=Comment.Status.PENDING,
         )
 
 

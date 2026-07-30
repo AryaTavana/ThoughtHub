@@ -1,5 +1,7 @@
 from datetime import timedelta
+from unittest.mock import Mock
 
+from django.contrib import admin as django_admin
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase, TestCase
@@ -8,7 +10,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
-from .admin import PostAdminForm
+from .admin import CommentAdmin, PostAdminForm
 from .models import Category, Comment, Post, PostBlock, Tag
 
 
@@ -338,6 +340,125 @@ class CommentModelTests(TestCase):
             str(comment),
             'Deleted user on Post with comments',
         )
+
+
+class CommentAdminTests(TestCase):
+    def setUp(self):
+        self.author = get_user_model().objects.create_user(
+            username='admin-comment-author',
+            password='StrongPassword123!',
+        )
+        self.post = Post.objects.create(
+            title='Admin moderated post',
+            status=Post.Status.PUBLISHED,
+        )
+        self.comment_admin = CommentAdmin(Comment, django_admin.site)
+        self.comment_admin.message_user = Mock()
+
+    def test_comment_model_is_registered_in_admin(self):
+        self.assertIsInstance(
+            django_admin.site._registry[Comment],
+            CommentAdmin,
+        )
+
+    def test_bulk_approve_clears_feedback_and_updates_post_count(self):
+        comment = Comment.objects.create(
+            post=self.post,
+            author=self.author,
+            content='Comment to approve',
+            status=Comment.Status.REJECTED,
+            moderation_feedback='Old moderation feedback',
+        )
+
+        self.comment_admin.approve_selected_comments(
+            request=Mock(),
+            queryset=Comment.objects.filter(pk=comment.pk),
+        )
+
+        comment.refresh_from_db()
+        self.post.refresh_from_db()
+        self.assertEqual(comment.status, Comment.Status.APPROVED)
+        self.assertEqual(comment.moderation_feedback, '')
+        self.assertEqual(self.post.comments, 1)
+
+    def test_bulk_reject_updates_post_count(self):
+        comment = Comment.objects.create(
+            post=self.post,
+            author=self.author,
+            content='Comment to reject',
+            status=Comment.Status.APPROVED,
+        )
+        Post.objects.filter(pk=self.post.pk).update(comments=1)
+
+        self.comment_admin.reject_selected_comments(
+            request=Mock(),
+            queryset=Comment.objects.filter(pk=comment.pk),
+        )
+
+        comment.refresh_from_db()
+        self.post.refresh_from_db()
+        self.assertEqual(comment.status, Comment.Status.REJECTED)
+        self.assertEqual(self.post.comments, 0)
+
+    def test_individual_admin_save_updates_post_count(self):
+        comment = Comment.objects.create(
+            post=self.post,
+            author=self.author,
+            content='Individually approved comment',
+        )
+        comment.status = Comment.Status.APPROVED
+
+        self.comment_admin.save_model(
+            request=Mock(),
+            obj=comment,
+            form=None,
+            change=True,
+        )
+
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.comments, 1)
+
+    def test_individual_admin_delete_updates_post_count(self):
+        comment = Comment.objects.create(
+            post=self.post,
+            author=self.author,
+            content='Approved comment to delete',
+            status=Comment.Status.APPROVED,
+        )
+        Post.objects.filter(pk=self.post.pk).update(comments=1)
+
+        self.comment_admin.delete_model(
+            request=Mock(),
+            obj=comment,
+        )
+
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.comments, 0)
+
+    def test_bulk_admin_delete_updates_post_count(self):
+        first_comment = Comment.objects.create(
+            post=self.post,
+            author=self.author,
+            content='First approved comment',
+            status=Comment.Status.APPROVED,
+        )
+        second_comment = Comment.objects.create(
+            post=self.post,
+            author=self.author,
+            content='Second approved comment',
+            status=Comment.Status.APPROVED,
+        )
+        Post.objects.filter(pk=self.post.pk).update(comments=2)
+
+        self.comment_admin.delete_queryset(
+            request=Mock(),
+            queryset=Comment.objects.filter(
+                pk__in=(first_comment.pk, second_comment.pk),
+            ),
+        )
+
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.comments, 0)
 
 
 class TaxonomyListAPITests(APITestCase):

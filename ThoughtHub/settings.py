@@ -234,6 +234,13 @@ UNFOLD = {
                             'admin:Blog_postblock_changelist',
                         ),
                     },
+                    {
+                        'title': _('Comments'),
+                        'icon': 'comment',
+                        'link': reverse_lazy(
+                            'admin:Blog_comment_changelist',
+                        ),
+                    },
                 ],
             },
             {

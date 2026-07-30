@@ -52,11 +52,16 @@ function renderRoute(
 }
 
 describe('application routes', () => {
-  it('renders the home page with main navigation', () => {
+  it('renders the home page with signed-out navigation', () => {
     renderRoute('/')
 
     expect(
       screen.getByRole('heading', { name: 'ThoughtHub' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('navigation', {
+        name: 'Primary navigation',
+      }),
     ).toBeInTheDocument()
     expect(
       screen.getByRole('link', { name: 'Log in' }),
@@ -65,8 +70,8 @@ describe('application routes', () => {
       screen.getByRole('link', { name: 'Create account' }),
     ).toHaveAttribute('href', '/register')
     expect(
-      screen.getByRole('link', { name: 'Dashboard' }),
-    ).toHaveAttribute('href', '/dashboard')
+      screen.queryByRole('link', { name: 'Dashboard' }),
+    ).not.toBeInTheDocument()
   })
 
   it.each([

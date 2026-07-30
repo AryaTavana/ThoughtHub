@@ -8,16 +8,15 @@ import './App.css'
 import {LoginPage} from './pages/LoginPage'
 import {RegistrationPage} from './pages/RegistrationPage'
 import {ProtectedRoute} from './auth/ProtectedRoute'
+import {AppNavbar} from './components/AppNavbar'
 
 function HomePage() {
     return (
-        <section>
+        <section className="container py-5">
             <h1>ThoughtHub</h1>
-            <nav aria-label="Main navigation">
-                <Link to="/login">Log in</Link>{' '}
-                <Link to="/register">Create account</Link>{' '}
-                <Link to="/dashboard">Dashboard</Link>
-            </nav>
+            <p className="text-secondary">
+                Discover ideas and stories from our community.
+            </p>
         </section>
     )
 }
@@ -37,23 +36,26 @@ function NotFoundPage() {
 
 function App() {
     return (
-        <main className="app">
-            <Routes>
-                <Route path="/" element={<HomePage/>}/>
-                <Route path="/login" element={<LoginPage/>}/>
-                <Route
-                    path="/register"
-                    element={<RegistrationPage/>}
-                />
-                <Route element={<ProtectedRoute/>}>
+        <div className="app d-flex flex-column">
+            <AppNavbar/>
+            <main className="flex-grow-1">
+                <Routes>
+                    <Route path="/" element={<HomePage/>}/>
+                    <Route path="/login" element={<LoginPage/>}/>
                     <Route
-                        path="/dashboard"
-                        element={<DashboardPage/>}
+                        path="/register"
+                        element={<RegistrationPage/>}
                     />
-                </Route>
-                <Route path="*" element={<NotFoundPage/>}/>
-            </Routes>
-        </main>
+                    <Route element={<ProtectedRoute/>}>
+                        <Route
+                            path="/dashboard"
+                            element={<DashboardPage/>}
+                        />
+                    </Route>
+                    <Route path="*" element={<NotFoundPage/>}/>
+                </Routes>
+            </main>
+        </div>
     )
 }
 

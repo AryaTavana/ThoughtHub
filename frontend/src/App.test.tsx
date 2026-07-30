@@ -14,6 +14,12 @@ import {
   type AuthContextValue,
 } from './auth/auth-context'
 
+vi.mock('./api/posts', () => ({
+  getPublishedPosts: vi.fn(
+    () => new Promise(() => {}),
+  ),
+}))
+
 const signedOutAuth: AuthContextValue = {
   user: null,
   isAuthenticated: false,

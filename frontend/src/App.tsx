@@ -10,6 +10,7 @@ import {RegistrationPage} from './pages/RegistrationPage'
 import {ProtectedRoute} from './auth/ProtectedRoute'
 import {AppNavbar} from './components/AppNavbar'
 import {PublicPostsPage} from './pages/PublicPostsPage'
+import {PublicPostDetailPage} from './pages/PublicPostDetailPage'
 
 function DashboardPage() {
     return <h1>Dashboard</h1>
@@ -31,6 +32,10 @@ function App() {
             <main className="flex-grow-1">
                 <Routes>
                     <Route path="/" element={<PublicPostsPage/>}/>
+                    <Route
+                        path="/posts/:slug"
+                        element={<PublicPostDetailPage/>}
+                    />
                     <Route path="/login" element={<LoginPage/>}/>
                     <Route
                         path="/register"

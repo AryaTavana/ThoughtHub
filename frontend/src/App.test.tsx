@@ -15,6 +15,9 @@ import {
 } from './auth/auth-context'
 
 vi.mock('./api/posts', () => ({
+  getPublishedPost: vi.fn(
+    () => new Promise(() => {}),
+  ),
   getPublishedPosts: vi.fn(
     () => new Promise(() => {}),
   ),
@@ -89,6 +92,14 @@ describe('application routes', () => {
     expect(
       screen.getByRole('heading', { name: heading }),
     ).toBeInTheDocument()
+  })
+
+  it('renders a public post detail route without authentication', () => {
+    renderRoute('/posts/example-post')
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Loading post…',
+    )
   })
 
   it('redirects a signed-out dashboard visitor to login', () => {

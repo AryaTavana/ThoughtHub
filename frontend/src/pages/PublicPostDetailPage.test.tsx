@@ -23,16 +23,33 @@ import {
 
 import { ApiError } from '../api/client'
 import {
+  getPostComments,
+  type PublicComment,
+} from '../api/comments'
+import type { PaginatedResponse } from '../api/pagination'
+import {
   getPublishedPost,
   type PublicPostDetail,
 } from '../api/posts'
 import { PublicPostDetailPage } from './PublicPostDetailPage'
 
+vi.mock('../api/comments', () => ({
+  getPostComments: vi.fn(),
+}))
+
 vi.mock('../api/posts', () => ({
   getPublishedPost: vi.fn(),
 }))
 
+const getPostCommentsMock = vi.mocked(getPostComments)
 const getPublishedPostMock = vi.mocked(getPublishedPost)
+
+const emptyCommentsPage: PaginatedResponse<PublicComment> = {
+  count: 0,
+  next: null,
+  previous: null,
+  results: [],
+}
 
 const publishedPost: PublicPostDetail = {
   id: 12,
@@ -115,6 +132,7 @@ describe('PublicPostDetailPage', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     document.title = 'ThoughtHub tests'
+    getPostCommentsMock.mockResolvedValue(emptyCommentsPage)
     getPublishedPostMock.mockResolvedValue(publishedPost)
   })
 
@@ -173,8 +191,17 @@ describe('PublicPostDetailPage', () => {
     expect(
       screen.getByText('ThoughtHub editor'),
     ).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent(
+    expect(
+      await screen.findByText('No approved comments yet.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Comments are closed for this post.'),
+    ).toHaveTextContent(
       'Comments are closed for this post.',
+    )
+    expect(getPostCommentsMock).toHaveBeenCalledWith(
+      'learning-django-and-react',
+      { page: 1 },
     )
 
     const firstBlock = screen.getByText('First block')

@@ -14,6 +14,7 @@ import {
     type PublicPostDetail,
 } from '../api/posts'
 import {PostContentBlock} from '../components/PostContentBlock'
+import {PostCommentsSection} from '../components/PostCommentsSection'
 
 const postDateFormatter = new Intl.DateTimeFormat(
     undefined,
@@ -291,6 +292,11 @@ export function PublicPostDetailPage() {
                                 </div>
                             )}
                         </footer>
+
+                        <PostCommentsSection
+                            key={post.slug}
+                            slug={post.slug}
+                        />
                     </article>
                 )}
         </section>

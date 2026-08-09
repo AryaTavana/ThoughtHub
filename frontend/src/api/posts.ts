@@ -11,10 +11,8 @@ export type PostType =
 
 export type PostStatus =
     | 'draft'
-    | 'in_review'
-    | 'scheduled'
     | 'published'
-    | 'rejected'
+    | 'removed'
     | 'archived'
 
 export type PostBlockType =
@@ -65,12 +63,63 @@ export type AuthorPostListItem =
         updated_at: string
     }
 
+export interface AuthorPostDetail {
+    id: number
+    title: string
+    slug: string
+    excerpt: string
+    content: string
+    category: number | null
+    tags: number[]
+    featured_image: string | null
+    featured_image_alt: string
+    post_type: PostType
+    allow_comments: boolean
+    meta_title: string
+    meta_description: string
+    status: PostStatus
+    review_feedback: string
+    published_at: string | null
+    date_posted: string
+    updated_at: string
+}
+
+export interface AuthorPostInput {
+    title: string
+    excerpt: string
+    content: string
+    category: number | null
+    tags: number[]
+    featured_image_alt: string
+    post_type: PostType
+    allow_comments: boolean
+    meta_title: string
+    meta_description: string
+}
+
 export interface PublicPostBlock {
     id: number
     block_type: PostBlockType
     position: number
     content: string
     image: string | null
+    image_alt: string
+    caption: string
+    image_width: ImageWidth
+    video_url: string
+    quote_attribution: string
+}
+
+export interface AuthorPostBlock extends PublicPostBlock {
+    created_at: string
+    updated_at: string
+}
+
+export interface AuthorPostBlockInput {
+    block_type: PostBlockType
+    position: number
+    content: string
+    image?: File | null
     image_alt: string
     caption: string
     image_width: ImageWidth
@@ -139,5 +188,144 @@ export function getAuthorPosts(
 
     return apiRequest<PaginatedResponse<AuthorPostListItem>>(
         path,
+    )
+}
+
+export function getAuthorPost(
+    postId: number,
+): Promise<AuthorPostDetail> {
+    return apiRequest<AuthorPostDetail>(
+        `/api/dashboard/posts/${postId}/`,
+    )
+}
+
+export function createAuthorPost(
+    input: AuthorPostInput,
+): Promise<AuthorPostDetail> {
+    return apiRequest<AuthorPostDetail>(
+        '/api/dashboard/posts/',
+        {
+            method: 'POST',
+            body: JSON.stringify(input),
+        },
+    )
+}
+
+export function updateAuthorPost(
+    postId: number,
+    input: AuthorPostInput,
+): Promise<AuthorPostDetail> {
+    return apiRequest<AuthorPostDetail>(
+        `/api/dashboard/posts/${postId}/`,
+        {
+            method: 'PUT',
+            body: JSON.stringify(input),
+        },
+    )
+}
+
+export function deleteAuthorPost(postId: number): Promise<null> {
+    return apiRequest<null>(
+        `/api/dashboard/posts/${postId}/`,
+        {method: 'DELETE'},
+    )
+}
+
+export function publishAuthorPost(
+    postId: number,
+): Promise<AuthorPostDetail> {
+    return apiRequest<AuthorPostDetail>(
+        `/api/dashboard/posts/${postId}/publish/`,
+        {method: 'POST'},
+    )
+}
+
+export function getCategories(): Promise<Category[]> {
+    return apiRequest<Category[]>('/api/categories/')
+}
+
+export function getTags(): Promise<Tag[]> {
+    return apiRequest<Tag[]>('/api/tags/')
+}
+
+function createPostBlockFormData(
+    input: AuthorPostBlockInput,
+): FormData {
+    const formData = new FormData()
+
+    formData.set('block_type', input.block_type)
+    formData.set('position', String(input.position))
+    formData.set('content', input.content)
+    formData.set('image_alt', input.image_alt)
+    formData.set('caption', input.caption)
+    formData.set('image_width', input.image_width)
+    formData.set('video_url', input.video_url)
+    formData.set(
+        'quote_attribution',
+        input.quote_attribution,
+    )
+
+    if (input.image) {
+        formData.set('image', input.image)
+    }
+
+    return formData
+}
+
+export function getAuthorPostBlocks(
+    postId: number,
+): Promise<AuthorPostBlock[]> {
+    return apiRequest<AuthorPostBlock[]>(
+        `/api/dashboard/posts/${postId}/blocks/`,
+    )
+}
+
+export function createAuthorPostBlock(
+    postId: number,
+    input: AuthorPostBlockInput,
+): Promise<AuthorPostBlock> {
+    return apiRequest<AuthorPostBlock>(
+        `/api/dashboard/posts/${postId}/blocks/`,
+        {
+            method: 'POST',
+            body: createPostBlockFormData(input),
+        },
+    )
+}
+
+export function updateAuthorPostBlock(
+    postId: number,
+    blockId: number,
+    input: AuthorPostBlockInput,
+): Promise<AuthorPostBlock> {
+    return apiRequest<AuthorPostBlock>(
+        `/api/dashboard/posts/${postId}/blocks/${blockId}/`,
+        {
+            method: 'PATCH',
+            body: createPostBlockFormData(input),
+        },
+    )
+}
+
+export function deleteAuthorPostBlock(
+    postId: number,
+    blockId: number,
+): Promise<null> {
+    return apiRequest<null>(
+        `/api/dashboard/posts/${postId}/blocks/${blockId}/`,
+        {method: 'DELETE'},
+    )
+}
+
+export function reorderAuthorPostBlocks(
+    postId: number,
+    blockIds: number[],
+): Promise<AuthorPostBlock[]> {
+    return apiRequest<AuthorPostBlock[]>(
+        `/api/dashboard/posts/${postId}/blocks/reorder/`,
+        {
+            method: 'PUT',
+            body: JSON.stringify({block_ids: blockIds}),
+        },
     )
 }

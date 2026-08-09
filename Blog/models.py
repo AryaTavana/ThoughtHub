@@ -3,7 +3,6 @@ from math import ceil
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Q
 from django.utils import timezone
 from django.utils.html import strip_tags
 from django.utils.text import slugify
@@ -36,20 +35,16 @@ class Tag(models.Model):
 class PublishedPostQuerySet(models.QuerySet):
     def published(self):
         return self.filter(
+            status=Post.Status.PUBLISHED,
             published_at__lte=timezone.now(),
-        ).filter(
-            Q(status=Post.Status.PUBLISHED)
-            | Q(status=Post.Status.SCHEDULED),
         )
 
 
 class Post(models.Model):
     class Status(models.TextChoices):
         DRAFT = 'draft', 'Draft'
-        IN_REVIEW = 'in_review', 'In review'
-        SCHEDULED = 'scheduled', 'Scheduled'
         PUBLISHED = 'published', 'Published'
-        REJECTED = 'rejected', 'Rejected'
+        REMOVED = 'removed', 'Removed'
         ARCHIVED = 'archived', 'Archived'
 
     class PostType(models.TextChoices):
@@ -112,7 +107,7 @@ class Post(models.Model):
     )
     review_feedback = models.TextField(
         blank=True,
-        help_text='Feedback from the admin after reviewing this post.',
+        help_text='The moderator’s reason for removing this post.',
     )
     post_type = models.CharField(
         max_length=20,
@@ -138,7 +133,7 @@ class Post(models.Model):
         null=True,
         blank=True,
         db_index=True,
-        help_text='Required for scheduled posts.',
+        help_text='The most recent time this post was published.',
     )
     date_posted = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -153,62 +148,40 @@ class Post(models.Model):
         return self.title
 
     def apply_author_edit(self):
-        """Update the workflow status after an author edits the post."""
-        if self.status in {
-            self.Status.PUBLISHED,
-            self.Status.SCHEDULED,
-        }:
-            self.status = self.Status.IN_REVIEW
-        elif self.status == self.Status.REJECTED:
+        """Return removed content to a private draft when revised."""
+        if self.status == self.Status.REMOVED:
             self.status = self.Status.DRAFT
 
-    def submit_for_review(self):
-        """Move an editable post into the admin review queue."""
+    def publish(self):
+        """Publish an author-owned draft immediately."""
         if self.status not in {
             self.Status.DRAFT,
-            self.Status.REJECTED,
+            self.Status.REMOVED,
         }:
             raise ValidationError({
                 'status': (
-                    'Only draft or rejected posts can be submitted for review.'
+                    'Only draft or removed posts can be published.'
                 ),
             })
 
-        self.status = self.Status.IN_REVIEW
+        self.status = self.Status.PUBLISHED
+        self.published_at = timezone.now()
         self.review_feedback = ''
 
-    def approve(self, *, publish_at=None):
-        """Approve a reviewed post for immediate or scheduled publication."""
-        if self.status != self.Status.IN_REVIEW:
+    def remove(self, *, feedback):
+        """Hide a public post and retain an actionable reason."""
+        if self.status != self.Status.PUBLISHED:
             raise ValidationError({
-                'status': 'Only posts in review can be approved.',
-            })
-
-        now = timezone.now()
-        publication_time = publish_at or now
-
-        self.published_at = publication_time
-        self.review_feedback = ''
-        self.status = (
-            self.Status.SCHEDULED
-            if publication_time > now
-            else self.Status.PUBLISHED
-        )
-
-    def reject(self, *, feedback):
-        """Reject a reviewed post and save actionable feedback."""
-        if self.status != self.Status.IN_REVIEW:
-            raise ValidationError({
-                'status': 'Only posts in review can be rejected.',
+                'status': 'Only published posts can be removed.',
             })
 
         feedback = feedback.strip()
         if not feedback:
             raise ValidationError({
-                'review_feedback': 'Add feedback when rejecting a post.',
+                'review_feedback': 'Explain why this post was removed.',
             })
 
-        self.status = self.Status.REJECTED
+        self.status = self.Status.REMOVED
         self.review_feedback = feedback
 
     def clean(self):
@@ -221,15 +194,9 @@ class Post(models.Model):
                 ),
             })
 
-        if self.status == self.Status.SCHEDULED:
-            if not self.published_at:
-                raise ValidationError({
-                    'published_at': 'Choose a publication time for scheduled posts.',
-                })
-
-        if self.status == self.Status.REJECTED and not self.review_feedback.strip():
+        if self.status == self.Status.REMOVED and not self.review_feedback.strip():
             raise ValidationError({
-                'review_feedback': 'Add feedback when rejecting a post.',
+                'review_feedback': 'Explain why this post was removed.',
             })
 
     def save(self, *args, **kwargs):
@@ -264,7 +231,7 @@ class Post(models.Model):
     @property
     def is_public(self):
         return (
-                self.status in {self.Status.PUBLISHED, self.Status.SCHEDULED}
+                self.status == self.Status.PUBLISHED
                 and self.published_at is not None
                 and self.published_at <= timezone.now()
         )
@@ -400,9 +367,8 @@ class PostBlock(models.Model):
 
 class Comment(models.Model):
     class Status(models.TextChoices):
-        PENDING = 'pending', 'Pending'
         APPROVED = 'approved', 'Approved'
-        REJECTED = 'rejected', 'Rejected'
+        REMOVED = 'removed', 'Removed'
 
     post = models.ForeignKey(
         Post,
@@ -419,7 +385,7 @@ class Comment(models.Model):
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
-        default=Status.PENDING,
+        default=Status.APPROVED,
         db_index=True,
     )
     moderation_feedback = models.TextField(blank=True)
@@ -440,13 +406,31 @@ class Comment(models.Model):
                 'content': 'Comment content cannot be empty.',
             })
 
+        if (
+            self.status == self.Status.REMOVED
+            and not self.moderation_feedback.strip()
+        ):
+            raise ValidationError({
+                'moderation_feedback': (
+                    'Explain why this comment was removed.'
+                ),
+            })
+
     def approve(self):
         self.status = self.Status.APPROVED
         self.moderation_feedback = ''
 
-    def reject(self, *, feedback=''):
-        self.status = self.Status.REJECTED
-        self.moderation_feedback = feedback.strip()
+    def remove(self, *, feedback):
+        feedback = feedback.strip()
+        if not feedback:
+            raise ValidationError({
+                'moderation_feedback': (
+                    'Explain why this comment was removed.'
+                ),
+            })
+
+        self.status = self.Status.REMOVED
+        self.moderation_feedback = feedback
 
     class Meta:
         ordering = ('-created_at',)

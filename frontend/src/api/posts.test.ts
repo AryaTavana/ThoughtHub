@@ -8,9 +8,25 @@ import {
 
 import { ApiError, apiRequest } from './client'
 import {
+  createAuthorPostBlock,
+  createAuthorPost,
+  deleteAuthorPostBlock,
+  deleteAuthorPost,
+  getAuthorPost,
+  getAuthorPostBlocks,
   getAuthorPosts,
+  getCategories,
   getPublishedPost,
   getPublishedPosts,
+  getTags,
+  publishAuthorPost,
+  reorderAuthorPostBlocks,
+  updateAuthorPostBlock,
+  updateAuthorPost,
+  type AuthorPostBlock,
+  type AuthorPostBlockInput,
+  type AuthorPostDetail,
+  type AuthorPostInput,
   type AuthorPostListItem,
   type PaginatedResponse,
   type PublicPostDetail,
@@ -88,6 +104,67 @@ const authorPostsPage: PaginatedResponse<AuthorPostListItem> = {
   next: null,
   previous: null,
   results: [authorDraft],
+}
+
+const authorPostDetail: AuthorPostDetail = {
+  id: 20,
+  title: 'My unfinished article',
+  slug: 'my-unfinished-article',
+  excerpt: 'A draft introduction.',
+  content: 'The current draft body.',
+  category: 3,
+  tags: [5, 8],
+  featured_image: null,
+  featured_image_alt: '',
+  post_type: 'article',
+  allow_comments: true,
+  meta_title: '',
+  meta_description: '',
+  status: 'draft',
+  review_feedback: '',
+  published_at: null,
+  date_posted: '2026-07-29T08:00:00Z',
+  updated_at: '2026-07-30T10:15:00Z',
+}
+
+const authorPostInput: AuthorPostInput = {
+  title: 'My unfinished article',
+  excerpt: 'A draft introduction.',
+  content: 'The current draft body.',
+  category: 3,
+  tags: [5, 8],
+  featured_image_alt: '',
+  post_type: 'article',
+  allow_comments: true,
+  meta_title: '',
+  meta_description: '',
+}
+
+const authorPostBlock: AuthorPostBlock = {
+  id: 41,
+  block_type: 'rich_text',
+  position: 0,
+  content: '<p>A saved section.</p>',
+  image: null,
+  image_alt: '',
+  caption: '',
+  image_width: 'content',
+  video_url: '',
+  quote_attribution: '',
+  created_at: '2026-07-30T10:00:00Z',
+  updated_at: '2026-07-30T10:15:00Z',
+}
+
+const authorPostBlockInput: AuthorPostBlockInput = {
+  block_type: 'rich_text',
+  position: 0,
+  content: '<p>A saved section.</p>',
+  image: null,
+  image_alt: '',
+  caption: '',
+  image_width: 'content',
+  video_url: '',
+  quote_attribution: '',
 }
 
 const publishedPostDetail: PublicPostDetail = {
@@ -334,6 +411,179 @@ describe('author posts API service', () => {
     await expect(getAuthorPosts()).rejects.toBe(error)
     expect(apiRequestMock).toHaveBeenCalledWith(
       '/api/dashboard/posts/',
+    )
+  })
+
+  it('loads one author post for editing', async () => {
+    apiRequestMock.mockResolvedValue(authorPostDetail)
+
+    await expect(getAuthorPost(20)).resolves.toEqual(
+      authorPostDetail,
+    )
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/api/dashboard/posts/20/',
+    )
+  })
+
+  it('creates a draft with JSON input', async () => {
+    apiRequestMock.mockResolvedValue(authorPostDetail)
+
+    await expect(
+      createAuthorPost(authorPostInput),
+    ).resolves.toEqual(authorPostDetail)
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/api/dashboard/posts/',
+      {
+        method: 'POST',
+        body: JSON.stringify(authorPostInput),
+      },
+    )
+  })
+
+  it('updates an existing author post', async () => {
+    apiRequestMock.mockResolvedValue(authorPostDetail)
+
+    await expect(
+      updateAuthorPost(20, authorPostInput),
+    ).resolves.toEqual(authorPostDetail)
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/api/dashboard/posts/20/',
+      {
+        method: 'PUT',
+        body: JSON.stringify(authorPostInput),
+      },
+    )
+  })
+
+  it('deletes an author post', async () => {
+    apiRequestMock.mockResolvedValue(null)
+
+    await expect(deleteAuthorPost(20)).resolves.toBeNull()
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/api/dashboard/posts/20/',
+      { method: 'DELETE' },
+    )
+  })
+
+  it('publishes an author post immediately', async () => {
+    apiRequestMock.mockResolvedValue({
+      ...authorPostDetail,
+      status: 'published',
+    })
+
+    await publishAuthorPost(20)
+
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/api/dashboard/posts/20/publish/',
+      { method: 'POST' },
+    )
+  })
+
+  it('loads unpaginated category and tag choices', async () => {
+    const categories = [publishedPost.category]
+    const tags = publishedPost.tags
+    apiRequestMock
+      .mockResolvedValueOnce(categories)
+      .mockResolvedValueOnce(tags)
+
+    await expect(getCategories()).resolves.toEqual(categories)
+    await expect(getTags()).resolves.toEqual(tags)
+    expect(apiRequestMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/categories/',
+    )
+    expect(apiRequestMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/tags/',
+    )
+  })
+
+  it('loads ordered blocks for one author post', async () => {
+    apiRequestMock.mockResolvedValue([authorPostBlock])
+
+    await expect(getAuthorPostBlocks(20)).resolves.toEqual([
+      authorPostBlock,
+    ])
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/api/dashboard/posts/20/blocks/',
+    )
+  })
+
+  it('creates a block with multipart data', async () => {
+    apiRequestMock.mockResolvedValue(authorPostBlock)
+
+    await createAuthorPostBlock(20, authorPostBlockInput)
+
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/api/dashboard/posts/20/blocks/',
+      expect.objectContaining({ method: 'POST' }),
+    )
+    const options = apiRequestMock.mock.calls[0]?.[1]
+    const body = options?.body as FormData
+    expect(body).toBeInstanceOf(FormData)
+    expect(body.get('block_type')).toBe('rich_text')
+    expect(body.get('position')).toBe('0')
+    expect(body.get('content')).toBe('<p>A saved section.</p>')
+    expect(body.has('image')).toBe(false)
+  })
+
+  it('includes a selected image file in block data', async () => {
+    const image = new File(['image'], 'diagram.png', {
+      type: 'image/png',
+    })
+    apiRequestMock.mockResolvedValue({
+      ...authorPostBlock,
+      block_type: 'image',
+    })
+
+    await createAuthorPostBlock(20, {
+      ...authorPostBlockInput,
+      block_type: 'image',
+      image,
+      image_alt: 'System diagram',
+      caption: 'Request flow',
+      image_width: 'wide',
+    })
+
+    const options = apiRequestMock.mock.calls[0]?.[1]
+    const body = options?.body as FormData
+    expect(body.get('image')).toBe(image)
+    expect(body.get('image_alt')).toBe('System diagram')
+    expect(body.get('caption')).toBe('Request flow')
+    expect(body.get('image_width')).toBe('wide')
+  })
+
+  it('updates and deletes an existing post block', async () => {
+    apiRequestMock
+      .mockResolvedValueOnce(authorPostBlock)
+      .mockResolvedValueOnce(null)
+
+    await updateAuthorPostBlock(20, 41, authorPostBlockInput)
+    await deleteAuthorPostBlock(20, 41)
+
+    expect(apiRequestMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/dashboard/posts/20/blocks/41/',
+      expect.objectContaining({ method: 'PATCH' }),
+    )
+    expect(apiRequestMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/dashboard/posts/20/blocks/41/',
+      { method: 'DELETE' },
+    )
+  })
+
+  it('sends the complete block order atomically', async () => {
+    apiRequestMock.mockResolvedValue([authorPostBlock])
+
+    await reorderAuthorPostBlocks(20, [44, 41])
+
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/api/dashboard/posts/20/blocks/reorder/',
+      {
+        method: 'PUT',
+        body: JSON.stringify({ block_ids: [44, 41] }),
+      },
     )
   })
 })

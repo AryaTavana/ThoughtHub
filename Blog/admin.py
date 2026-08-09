@@ -31,13 +31,14 @@ def _sync_post_comment_counts(post_ids):
 
 
 class PostAdminForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['review_feedback'].label = 'Removal feedback'
+
     def clean(self):
         cleaned_data = super().clean()
 
-        if cleaned_data.get('status') in {
-            Post.Status.PUBLISHED,
-            Post.Status.SCHEDULED,
-        }:
+        if cleaned_data.get('status') == Post.Status.PUBLISHED:
             cleaned_data['review_feedback'] = ''
 
         return cleaned_data
@@ -203,8 +204,7 @@ class CommentAdmin(ModelAdmin):
     date_hierarchy = 'created_at'
     ordering = ('-created_at',)
     actions = (
-        'approve_selected_comments',
-        'reject_selected_comments',
+        'restore_selected_comments',
     )
     fieldsets = (
         (
@@ -245,8 +245,8 @@ class CommentAdmin(ModelAdmin):
 
         return f'{obj.content[:77]}...'
 
-    @admin.action(description='Approve selected comments')
-    def approve_selected_comments(self, request, queryset):
+    @admin.action(description='Restore selected comments')
+    def restore_selected_comments(self, request, queryset):
         post_ids = set(queryset.values_list('post_id', flat=True))
         updated_count = queryset.update(
             status=Comment.Status.APPROVED,
@@ -256,20 +256,7 @@ class CommentAdmin(ModelAdmin):
         _sync_post_comment_counts(post_ids)
         self.message_user(
             request,
-            f'{updated_count} comment(s) approved.',
-        )
-
-    @admin.action(description='Reject selected comments')
-    def reject_selected_comments(self, request, queryset):
-        post_ids = set(queryset.values_list('post_id', flat=True))
-        updated_count = queryset.update(
-            status=Comment.Status.REJECTED,
-            updated_at=timezone.now(),
-        )
-        _sync_post_comment_counts(post_ids)
-        self.message_user(
-            request,
-            f'{updated_count} comment(s) rejected.',
+            f'{updated_count} comment(s) restored.',
         )
 
     def save_model(self, request, obj, form, change):

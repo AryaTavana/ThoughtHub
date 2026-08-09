@@ -313,6 +313,23 @@ class LoginAPITests(APITestCase):
         self.assertEqual(me_response.status_code, status.HTTP_200_OK)
         self.assertEqual(me_response.data['id'], self.user.id)
 
+    def test_trusted_frontend_origin_can_log_in_through_vite(self):
+        csrf_token = self.get_csrf_token()
+
+        response = self.client.post(
+            self.login_url,
+            {
+                'username': self.user.username,
+                'password': self.password,
+            },
+            format='json',
+            HTTP_X_CSRFTOKEN=csrf_token,
+            HTTP_ORIGIN='http://localhost:5173',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['username'], self.user.username)
+
     def test_invalid_credentials_do_not_create_session(self):
         csrf_token = self.get_csrf_token()
 

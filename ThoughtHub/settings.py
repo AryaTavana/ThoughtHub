@@ -33,6 +33,18 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+# The development frontend runs through Vite, so unsafe API requests arrive
+# with the frontend origin even though Vite proxies them to Django. Production
+# deployments can replace this comma-separated list in the environment.
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        'CSRF_TRUSTED_ORIGINS',
+        'http://localhost:5173,http://127.0.0.1:5173',
+    ).split(',')
+    if origin.strip()
+]
+
 # Application definition
 
 INSTALLED_APPS = [

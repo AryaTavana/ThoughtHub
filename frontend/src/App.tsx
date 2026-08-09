@@ -12,6 +12,7 @@ import {AppNavbar} from './components/AppNavbar'
 import {PublicPostsPage} from './pages/PublicPostsPage'
 import {PublicPostDetailPage} from './pages/PublicPostDetailPage'
 import {DashboardPage} from './pages/DashboardPage'
+import {PostEditorPage} from './pages/PostEditorPage'
 
 function NotFoundPage() {
     return (
@@ -42,6 +43,14 @@ function App() {
                         <Route
                             path="/dashboard"
                             element={<DashboardPage/>}
+                        />
+                        <Route
+                            path="/dashboard/posts/new"
+                            element={<PostEditorPage/>}
+                        />
+                        <Route
+                            path="/dashboard/posts/:postId/edit"
+                            element={<PostEditorPage/>}
                         />
                     </Route>
                     <Route path="*" element={<NotFoundPage/>}/>

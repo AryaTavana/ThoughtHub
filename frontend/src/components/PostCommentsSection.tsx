@@ -46,6 +46,14 @@ export function PostCommentsSection({
     const [loadError, setLoadError] =
         useState<string | null>(null)
 
+    function handleCommentPublished() {
+        if (page === 1) {
+            setReloadKey((currentKey) => currentKey + 1)
+        } else {
+            setPage(1)
+        }
+    }
+
     useEffect(() => {
         let isCancelled = false
 
@@ -112,6 +120,7 @@ export function PostCommentsSection({
             <PostCommentForm
                 slug={slug}
                 allowComments={allowComments}
+                onCommentPublished={handleCommentPublished}
             />
 
             {isLoading && (
@@ -149,7 +158,7 @@ export function PostCommentsSection({
                 !loadError &&
                 commentsPage?.results.length === 0 && (
                     <p className="text-secondary">
-                        No approved comments yet.
+                        No comments yet.
                     </p>
                 )}
 

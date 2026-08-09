@@ -1,9 +1,11 @@
 from datetime import timedelta
+import tempfile
 from unittest.mock import Mock
 
 from django.contrib import admin as django_admin
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -15,13 +17,13 @@ from .models import Category, Comment, Post, PostBlock, Tag
 
 
 class PostAdminFormTests(SimpleTestCase):
-    def test_publishing_clears_old_rejection_feedback(self):
+    def test_publishing_clears_old_removal_feedback(self):
         form = PostAdminForm()
         form.cleaned_data = {
             'title': 'Approved post',
             'status': Post.Status.PUBLISHED,
             'post_type': Post.PostType.ARTICLE,
-            'review_feedback': 'Old rejection feedback',
+            'review_feedback': 'Old removal feedback',
         }
 
         cleaned_data = form.clean()
@@ -30,7 +32,7 @@ class PostAdminFormTests(SimpleTestCase):
 
 
 class PostValidationTests(SimpleTestCase):
-    def test_author_edit_returns_published_post_to_review(self):
+    def test_author_edit_keeps_published_post_public(self):
         post = Post(
             title='Published post',
             status=Post.Status.PUBLISHED,
@@ -38,22 +40,13 @@ class PostValidationTests(SimpleTestCase):
 
         post.apply_author_edit()
 
-        self.assertEqual(post.status, Post.Status.IN_REVIEW)
+        self.assertEqual(post.status, Post.Status.PUBLISHED)
 
-    def test_author_edit_returns_scheduled_post_to_review(self):
+    def test_author_edit_turns_removed_post_into_draft(self):
         post = Post(
-            title='Scheduled post',
-            status=Post.Status.SCHEDULED,
-        )
-
-        post.apply_author_edit()
-
-        self.assertEqual(post.status, Post.Status.IN_REVIEW)
-
-    def test_author_edit_turns_rejected_post_into_draft(self):
-        post = Post(
-            title='Rejected post',
-            status=Post.Status.REJECTED,
+            title='Removed post',
+            status=Post.Status.REMOVED,
+            review_feedback='Please remove private information.',
         )
 
         post.apply_author_edit()
@@ -63,7 +56,6 @@ class PostValidationTests(SimpleTestCase):
     def test_author_edit_does_not_change_other_workflow_statuses(self):
         unchanged_statuses = (
             Post.Status.DRAFT,
-            Post.Status.IN_REVIEW,
             Post.Status.ARCHIVED,
         )
 
@@ -75,29 +67,31 @@ class PostValidationTests(SimpleTestCase):
 
                 self.assertEqual(post.status, status)
 
-    def test_draft_can_be_submitted_for_review(self):
+    def test_draft_can_be_published_immediately(self):
         post = Post(
             title='Draft post',
             status=Post.Status.DRAFT,
         )
 
-        post.submit_for_review()
+        before_publish = timezone.now()
+        post.publish()
 
-        self.assertEqual(post.status, Post.Status.IN_REVIEW)
+        self.assertEqual(post.status, Post.Status.PUBLISHED)
+        self.assertGreaterEqual(post.published_at, before_publish)
 
-    def test_resubmission_clears_old_rejection_feedback(self):
+    def test_republishing_removed_post_clears_feedback(self):
         post = Post(
-            title='Rejected post',
-            status=Post.Status.REJECTED,
-            review_feedback='Old feedback',
+            title='Removed post',
+            status=Post.Status.REMOVED,
+            review_feedback='Remove personal information.',
         )
 
-        post.submit_for_review()
+        post.publish()
 
-        self.assertEqual(post.status, Post.Status.IN_REVIEW)
+        self.assertEqual(post.status, Post.Status.PUBLISHED)
         self.assertEqual(post.review_feedback, '')
 
-    def test_published_post_cannot_be_submitted_for_review(self):
+    def test_published_post_cannot_be_published_again(self):
         post = Post(
             title='Published post',
             status=Post.Status.PUBLISHED,
@@ -105,75 +99,37 @@ class PostValidationTests(SimpleTestCase):
 
         with self.assertRaisesMessage(
                 ValidationError,
-                'Only draft or rejected posts can be submitted for review.',
+                'Only draft or removed posts can be published.',
         ):
-            post.submit_for_review()
+            post.publish()
 
-    def test_post_in_review_can_be_approved_for_immediate_publication(self):
+    def test_published_post_can_be_removed_with_trimmed_feedback(self):
         post = Post(
-            title='Reviewed post',
-            status=Post.Status.IN_REVIEW,
-            review_feedback='Old feedback',
+            title='Public post',
+            status=Post.Status.PUBLISHED,
         )
 
-        before_approval = timezone.now()
-        post.approve()
+        post.remove(feedback='  Remove private information.  ')
 
-        self.assertEqual(post.status, Post.Status.PUBLISHED)
-        self.assertGreaterEqual(post.published_at, before_approval)
-        self.assertEqual(post.review_feedback, '')
-
-    def test_post_in_review_can_be_approved_for_scheduled_publication(self):
-        publication_time = timezone.now() + timedelta(days=1)
-        post = Post(
-            title='Reviewed post',
-            status=Post.Status.IN_REVIEW,
-        )
-
-        post.approve(publish_at=publication_time)
-
-        self.assertEqual(post.status, Post.Status.SCHEDULED)
-        self.assertEqual(post.published_at, publication_time)
-
-    def test_post_outside_review_cannot_be_approved(self):
-        post = Post(
-            title='Draft post',
-            status=Post.Status.DRAFT,
-        )
-
-        with self.assertRaisesMessage(
-                ValidationError,
-                'Only posts in review can be approved.',
-        ):
-            post.approve()
-
-    def test_post_in_review_can_be_rejected_with_trimmed_feedback(self):
-        post = Post(
-            title='Reviewed post',
-            status=Post.Status.IN_REVIEW,
-        )
-
-        post.reject(feedback='  Improve the introduction.  ')
-
-        self.assertEqual(post.status, Post.Status.REJECTED)
+        self.assertEqual(post.status, Post.Status.REMOVED)
         self.assertEqual(
             post.review_feedback,
-            'Improve the introduction.',
+            'Remove private information.',
         )
 
-    def test_rejection_requires_feedback(self):
+    def test_removal_requires_feedback(self):
         post = Post(
-            title='Reviewed post',
-            status=Post.Status.IN_REVIEW,
+            title='Public post',
+            status=Post.Status.PUBLISHED,
         )
 
         with self.assertRaisesMessage(
                 ValidationError,
-                'Add feedback when rejecting a post.',
+                'Explain why this post was removed.',
         ):
-            post.reject(feedback='   ')
+            post.remove(feedback='   ')
 
-    def test_post_outside_review_cannot_be_rejected(self):
+    def test_private_post_cannot_be_removed(self):
         post = Post(
             title='Draft post',
             status=Post.Status.DRAFT,
@@ -181,38 +137,38 @@ class PostValidationTests(SimpleTestCase):
 
         with self.assertRaisesMessage(
                 ValidationError,
-                'Only posts in review can be rejected.',
+                'Only published posts can be removed.',
         ):
-            post.reject(feedback='Needs work.')
+            post.remove(feedback='Needs work.')
 
-    def test_rejected_post_requires_review_feedback(self):
+    def test_removed_post_requires_moderation_feedback(self):
         post = Post(
-            title='Rejected post',
-            status=Post.Status.REJECTED,
+            title='Removed post',
+            status=Post.Status.REMOVED,
             review_feedback='   ',
         )
 
         with self.assertRaisesMessage(
                 ValidationError,
-                'Add feedback when rejecting a post.',
+                'Explain why this post was removed.',
         ):
             post.clean()
 
-    def test_rejected_post_accepts_review_feedback(self):
+    def test_removed_post_accepts_moderation_feedback(self):
         post = Post(
-            title='Rejected post',
-            status=Post.Status.REJECTED,
-            review_feedback='Please improve the introduction.',
+            title='Removed post',
+            status=Post.Status.REMOVED,
+            review_feedback='This included private information.',
         )
 
         post.clean()
 
 
 class CommentValidationTests(SimpleTestCase):
-    def test_new_comment_is_pending_by_default(self):
+    def test_new_comment_is_approved_by_default(self):
         comment = Comment(content='A new comment')
 
-        self.assertEqual(comment.status, Comment.Status.PENDING)
+        self.assertEqual(comment.status, Comment.Status.APPROVED)
 
     def test_comment_content_is_trimmed_during_validation(self):
         comment = Comment(content='  Helpful comment.  ')
@@ -233,7 +189,7 @@ class CommentValidationTests(SimpleTestCase):
     def test_approving_comment_clears_moderation_feedback(self):
         comment = Comment(
             content='Corrected comment',
-            status=Comment.Status.REJECTED,
+            status=Comment.Status.REMOVED,
             moderation_feedback='Old feedback',
         )
 
@@ -242,19 +198,27 @@ class CommentValidationTests(SimpleTestCase):
         self.assertEqual(comment.status, Comment.Status.APPROVED)
         self.assertEqual(comment.moderation_feedback, '')
 
-    def test_rejecting_comment_trims_moderation_feedback(self):
+    def test_removing_comment_requires_and_trims_feedback(self):
         comment = Comment(
             content='Comment requiring moderation',
-            status=Comment.Status.PENDING,
+            status=Comment.Status.APPROVED,
         )
 
-        comment.reject(feedback='  Please keep the discussion relevant.  ')
+        comment.remove(
+            feedback='  Please keep the discussion relevant.  ',
+        )
 
-        self.assertEqual(comment.status, Comment.Status.REJECTED)
+        self.assertEqual(comment.status, Comment.Status.REMOVED)
         self.assertEqual(
             comment.moderation_feedback,
             'Please keep the discussion relevant.',
         )
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            'Explain why this comment was removed.',
+        ):
+            Comment(content='Another comment').remove(feedback='   ')
 
     def test_deleted_comment_author_has_readable_string(self):
         comment = Comment(
@@ -293,12 +257,12 @@ class CommentModelTests(TestCase):
             status=Comment.Status.APPROVED,
         )
 
-    def test_created_comment_is_pending_in_database(self):
+    def test_created_comment_is_approved_in_database(self):
         self.first_comment.refresh_from_db()
 
         self.assertEqual(
             self.first_comment.status,
-            Comment.Status.PENDING,
+            Comment.Status.APPROVED,
         )
 
     def test_post_reverse_relation_returns_newest_comment_first(self):
@@ -361,16 +325,16 @@ class CommentAdminTests(TestCase):
             CommentAdmin,
         )
 
-    def test_bulk_approve_clears_feedback_and_updates_post_count(self):
+    def test_bulk_restore_clears_feedback_and_updates_post_count(self):
         comment = Comment.objects.create(
             post=self.post,
             author=self.author,
-            content='Comment to approve',
-            status=Comment.Status.REJECTED,
+            content='Comment to restore',
+            status=Comment.Status.REMOVED,
             moderation_feedback='Old moderation feedback',
         )
 
-        self.comment_admin.approve_selected_comments(
+        self.comment_admin.restore_selected_comments(
             request=Mock(),
             queryset=Comment.objects.filter(pk=comment.pk),
         )
@@ -381,23 +345,28 @@ class CommentAdminTests(TestCase):
         self.assertEqual(comment.moderation_feedback, '')
         self.assertEqual(self.post.comments, 1)
 
-    def test_bulk_reject_updates_post_count(self):
+    def test_individual_removal_updates_post_count(self):
         comment = Comment.objects.create(
             post=self.post,
             author=self.author,
-            content='Comment to reject',
+            content='Comment to remove',
             status=Comment.Status.APPROVED,
         )
         Post.objects.filter(pk=self.post.pk).update(comments=1)
 
-        self.comment_admin.reject_selected_comments(
+        comment.status = Comment.Status.REMOVED
+        comment.moderation_feedback = 'This comment was off topic.'
+
+        self.comment_admin.save_model(
             request=Mock(),
-            queryset=Comment.objects.filter(pk=comment.pk),
+            obj=comment,
+            form=None,
+            change=True,
         )
 
         comment.refresh_from_db()
         self.post.refresh_from_db()
-        self.assertEqual(comment.status, Comment.Status.REJECTED)
+        self.assertEqual(comment.status, Comment.Status.REMOVED)
         self.assertEqual(self.post.comments, 0)
 
     def test_individual_admin_save_updates_post_count(self):
@@ -559,10 +528,10 @@ class PublicPostListAPITests(APITestCase):
             content='Public content',
             status=Post.Status.PUBLISHED,
         )
-        cls.due_scheduled_post = Post.objects.create(
-            title='Due scheduled post',
-            content='Scheduled content',
-            status=Post.Status.SCHEDULED,
+        cls.second_public_post = Post.objects.create(
+            title='Second public post',
+            content='More public content',
+            status=Post.Status.PUBLISHED,
             published_at=timezone.now() - timedelta(minutes=1),
         )
 
@@ -571,17 +540,13 @@ class PublicPostListAPITests(APITestCase):
             status=Post.Status.DRAFT,
         )
         Post.objects.create(
-            title='Review post',
-            status=Post.Status.IN_REVIEW,
-        )
-        Post.objects.create(
-            title='Rejected post',
-            status=Post.Status.REJECTED,
-            review_feedback='Needs improvement.',
+            title='Removed post',
+            status=Post.Status.REMOVED,
+            review_feedback='This contained private information.',
         )
         Post.objects.create(
             title='Future post',
-            status=Post.Status.SCHEDULED,
+            status=Post.Status.PUBLISHED,
             published_at=timezone.now() + timedelta(days=1),
         )
         Post.objects.create(
@@ -604,7 +569,7 @@ class PublicPostListAPITests(APITestCase):
             returned_slugs,
             {
                 self.public_post.slug,
-                self.due_scheduled_post.slug,
+                self.second_public_post.slug,
             },
         )
         self.assertEqual(response.data['count'], 2)
@@ -732,15 +697,14 @@ class PublicPostCommentListCreateAPITests(APITestCase):
             title='Private commented draft',
             status=Post.Status.DRAFT,
         )
-        cls.future_post = Post.objects.create(
-            title='Future commented post',
-            status=Post.Status.SCHEDULED,
-            published_at=timezone.now() + timedelta(days=1),
+        cls.removed_post = Post.objects.create(
+            title='Removed commented post',
+            status=Post.Status.REMOVED,
+            review_feedback='Removed by a moderator.',
         )
-        cls.due_scheduled_post = Post.objects.create(
-            title='Due scheduled commented post',
-            status=Post.Status.SCHEDULED,
-            published_at=timezone.now() - timedelta(minutes=1),
+        cls.second_public_post = Post.objects.create(
+            title='Second public commented post',
+            status=Post.Status.PUBLISHED,
         )
 
         cls.approved_comment = Comment.objects.create(
@@ -749,17 +713,11 @@ class PublicPostCommentListCreateAPITests(APITestCase):
             content='Visible approved comment',
             status=Comment.Status.APPROVED,
         )
-        cls.pending_comment = Comment.objects.create(
+        cls.removed_comment = Comment.objects.create(
             post=cls.public_post,
             author=cls.commenter,
-            content='Hidden pending comment',
-            status=Comment.Status.PENDING,
-        )
-        cls.rejected_comment = Comment.objects.create(
-            post=cls.public_post,
-            author=cls.commenter,
-            content='Hidden rejected comment',
-            status=Comment.Status.REJECTED,
+            content='Hidden removed comment',
+            status=Comment.Status.REMOVED,
             moderation_feedback='Not suitable.',
         )
         cls.deleted_author_comment = Comment.objects.create(
@@ -776,10 +734,10 @@ class PublicPostCommentListCreateAPITests(APITestCase):
             content='Visible comment on closed post',
             status=Comment.Status.APPROVED,
         )
-        cls.due_scheduled_comment = Comment.objects.create(
-            post=cls.due_scheduled_post,
+        cls.second_public_comment = Comment.objects.create(
+            post=cls.second_public_post,
             author=cls.commenter,
-            content='Visible scheduled comment',
+            content='Visible comment on another post',
             status=Comment.Status.APPROVED,
         )
         Post.objects.filter(pk=cls.public_post.pk).update(comments=2)
@@ -810,8 +768,7 @@ class PublicPostCommentListCreateAPITests(APITestCase):
             comment_data['id']
             for comment_data in response.data['results']
         }
-        self.assertNotIn(self.pending_comment.pk, returned_ids)
-        self.assertNotIn(self.rejected_comment.pk, returned_ids)
+        self.assertNotIn(self.removed_comment.pk, returned_ids)
 
         for comment_data in response.data['results']:
             self.assertNotIn('status', comment_data)
@@ -840,20 +797,20 @@ class PublicPostCommentListCreateAPITests(APITestCase):
             self.closed_post_comment.pk,
         )
 
-    def test_due_scheduled_post_comments_are_public(self):
+    def test_another_published_post_comments_are_public(self):
         response = self.client.get(
-            self.comments_url(self.due_scheduled_post),
+            self.comments_url(self.second_public_post),
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 1)
         self.assertEqual(
             response.data['results'][0]['id'],
-            self.due_scheduled_comment.pk,
+            self.second_public_comment.pk,
         )
 
     def test_non_public_post_comments_return_not_found(self):
-        for post in (self.draft_post, self.future_post):
+        for post in (self.draft_post, self.removed_post):
             with self.subTest(post_status=post.status):
                 response = self.client.get(self.comments_url(post))
 
@@ -877,7 +834,7 @@ class PublicPostCommentListCreateAPITests(APITestCase):
             Comment.objects.filter(content='Anonymous comment').exists(),
         )
 
-    def test_authenticated_user_can_submit_trimmed_pending_comment(self):
+    def test_authenticated_user_can_publish_trimmed_comment_immediately(self):
         self.client.force_login(self.commenter)
 
         response = self.client.post(
@@ -894,17 +851,17 @@ class PublicPostCommentListCreateAPITests(APITestCase):
         self.assertEqual(comment.post, self.public_post)
         self.assertEqual(comment.author, self.commenter)
         self.assertEqual(comment.content, 'A thoughtful response.')
-        self.assertEqual(comment.status, Comment.Status.PENDING)
+        self.assertEqual(comment.status, Comment.Status.APPROVED)
         self.assertEqual(
             response.data['author_username'],
             self.commenter.username,
         )
         self.assertEqual(
             response.data['status'],
-            Comment.Status.PENDING,
+            Comment.Status.APPROVED,
         )
         self.public_post.refresh_from_db()
-        self.assertEqual(self.public_post.comments, 2)
+        self.assertEqual(self.public_post.comments, 3)
 
     def test_user_cannot_forge_comment_ownership_or_moderation(self):
         self.client.force_login(self.commenter)
@@ -915,7 +872,7 @@ class PublicPostCommentListCreateAPITests(APITestCase):
                 'content': 'Protected comment fields',
                 'post': self.closed_post.pk,
                 'author': self.other_user.pk,
-                'status': Comment.Status.APPROVED,
+                'status': Comment.Status.REMOVED,
                 'moderation_feedback': 'Fake feedback',
             },
             format='json',
@@ -928,7 +885,7 @@ class PublicPostCommentListCreateAPITests(APITestCase):
         comment = Comment.objects.get(pk=response.data['id'])
         self.assertEqual(comment.post, self.public_post)
         self.assertEqual(comment.author, self.commenter)
-        self.assertEqual(comment.status, Comment.Status.PENDING)
+        self.assertEqual(comment.status, Comment.Status.APPROVED)
         self.assertEqual(comment.moderation_feedback, '')
 
     def test_user_cannot_submit_comment_when_comments_are_closed(self):
@@ -952,7 +909,7 @@ class PublicPostCommentListCreateAPITests(APITestCase):
     def test_user_cannot_submit_comment_to_non_public_post(self):
         self.client.force_login(self.commenter)
 
-        for post in (self.draft_post, self.future_post):
+        for post in (self.draft_post, self.removed_post):
             with self.subTest(post_status=post.status):
                 response = self.client.post(
                     self.comments_url(post),
@@ -1047,6 +1004,92 @@ class PublicPostCommentListCreateAPITests(APITestCase):
                 )
 
 
+class AuthorCommentListAPITests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        user_model = get_user_model()
+        cls.author = user_model.objects.create_user(
+            username='comment-history-author',
+            password='StrongPassword123!',
+        )
+        cls.other_author = user_model.objects.create_user(
+            username='comment-history-other',
+            password='StrongPassword123!',
+        )
+        cls.post = Post.objects.create(
+            title='Comment history post',
+            status=Post.Status.PUBLISHED,
+        )
+        cls.approved_comment = Comment.objects.create(
+            post=cls.post,
+            author=cls.author,
+            content='A public contribution.',
+            status=Comment.Status.APPROVED,
+        )
+        cls.removed_comment = Comment.objects.create(
+            post=cls.post,
+            author=cls.author,
+            content='A moderated contribution.',
+            status=Comment.Status.REMOVED,
+            moderation_feedback='Please keep comments on topic.',
+        )
+        Comment.objects.create(
+            post=cls.post,
+            author=cls.other_author,
+            content='Another author comment.',
+        )
+        cls.url = reverse('blog:author-comment-list')
+
+    def test_anonymous_visitor_cannot_open_comment_history(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_author_sees_only_their_comments_and_removal_feedback(self):
+        self.client.force_login(self.author)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 2)
+        self.assertEqual(
+            {item['id'] for item in response.data['results']},
+            {self.approved_comment.pk, self.removed_comment.pk},
+        )
+        removed_data = next(
+            item
+            for item in response.data['results']
+            if item['id'] == self.removed_comment.pk
+        )
+        self.assertEqual(removed_data['post_title'], self.post.title)
+        self.assertEqual(removed_data['post_slug'], self.post.slug)
+        self.assertEqual(
+            removed_data['post_status'],
+            Post.Status.PUBLISHED,
+        )
+        self.assertEqual(
+            removed_data['moderation_feedback'],
+            'Please keep comments on topic.',
+        )
+
+    def test_comment_history_is_read_only(self):
+        self.client.force_login(self.author)
+
+        response = self.client.post(
+            self.url,
+            {'content': 'Not allowed'},
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+
+
 class AuthorPostListCreateAPITests(APITestCase):
     @classmethod
     def setUpTestData(cls):
@@ -1068,9 +1111,7 @@ class AuthorPostListCreateAPITests(APITestCase):
                 'status': post_status,
             }
 
-            if post_status == Post.Status.SCHEDULED:
-                post_data['published_at'] = timezone.now() + timedelta(days=1)
-            elif post_status == Post.Status.REJECTED:
+            if post_status == Post.Status.REMOVED:
                 post_data['review_feedback'] = 'Please improve this post.'
 
             cls.author_posts[post_status] = Post.objects.create(**post_data)
@@ -1111,13 +1152,13 @@ class AuthorPostListCreateAPITests(APITestCase):
             set(Post.Status.values),
         )
 
-        rejected_post_data = next(
+        removed_post_data = next(
             post_data
             for post_data in response.data['results']
-            if post_data['status'] == Post.Status.REJECTED
+            if post_data['status'] == Post.Status.REMOVED
         )
         self.assertEqual(
-            rejected_post_data['review_feedback'],
+            removed_post_data['review_feedback'],
             'Please improve this post.',
         )
 
@@ -1147,7 +1188,7 @@ class AuthorPostListCreateAPITests(APITestCase):
         )
 
     def test_dashboard_post_list_is_paginated(self):
-        for number in range(5):
+        for number in range(7):
             Post.objects.create(
                 title=f'Extra dashboard post {number}',
                 author=self.author,
@@ -1334,18 +1375,11 @@ class AuthorPostDetailAPITests(APITestCase):
             author=cls.author,
             status=Post.Status.PUBLISHED,
         )
-        cls.scheduled_post = Post.objects.create(
-            title='Scheduled article',
-            content='Original scheduled content',
+        cls.removed_post = Post.objects.create(
+            title='Removed article',
+            content='Original removed content',
             author=cls.author,
-            status=Post.Status.SCHEDULED,
-            published_at=timezone.now() + timedelta(days=1),
-        )
-        cls.rejected_post = Post.objects.create(
-            title='Rejected article',
-            content='Original rejected content',
-            author=cls.author,
-            status=Post.Status.REJECTED,
+            status=Post.Status.REMOVED,
             review_feedback='Rewrite the introduction.',
         )
         cls.other_post = Post.objects.create(
@@ -1472,24 +1506,22 @@ class AuthorPostDetailAPITests(APITestCase):
         self.assertFalse(self.draft_post.is_featured)
         self.assertEqual(self.draft_post.views, 0)
 
-    def test_published_and_scheduled_posts_return_to_review_after_edit(self):
+    def test_published_post_stays_public_after_author_edit(self):
         self.client.force_login(self.author)
 
-        for post in (self.published_post, self.scheduled_post):
-            with self.subTest(original_status=post.status):
-                response = self.client.patch(
-                    self.detail_url(post),
-                    {'excerpt': 'Edited by the author.'},
-                    format='json',
-                )
+        response = self.client.patch(
+            self.detail_url(self.published_post),
+            {'excerpt': 'Edited by the author.'},
+            format='json',
+        )
 
-                self.assertEqual(
-                    response.status_code,
-                    status.HTTP_200_OK,
-                )
-                post.refresh_from_db()
-                self.assertEqual(post.status, Post.Status.IN_REVIEW)
-                self.assertFalse(post.is_public)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.published_post.refresh_from_db()
+        self.assertEqual(
+            self.published_post.status,
+            Post.Status.PUBLISHED,
+        )
+        self.assertTrue(self.published_post.is_public)
 
     def test_read_only_input_does_not_change_published_workflow_status(self):
         self.client.force_login(self.author)
@@ -1508,20 +1540,20 @@ class AuthorPostDetailAPITests(APITestCase):
         )
         self.assertTrue(self.published_post.is_public)
 
-    def test_rejected_post_becomes_draft_after_edit(self):
+    def test_removed_post_becomes_draft_after_edit(self):
         self.client.force_login(self.author)
 
         response = self.client.patch(
-            self.detail_url(self.rejected_post),
+            self.detail_url(self.removed_post),
             {'content': 'A rewritten introduction.'},
             format='json',
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.rejected_post.refresh_from_db()
-        self.assertEqual(self.rejected_post.status, Post.Status.DRAFT)
+        self.removed_post.refresh_from_db()
+        self.assertEqual(self.removed_post.status, Post.Status.DRAFT)
         self.assertEqual(
-            self.rejected_post.review_feedback,
+            self.removed_post.review_feedback,
             'Rewrite the introduction.',
         )
 
@@ -1556,16 +1588,16 @@ class AuthorPostDetailAPITests(APITestCase):
         )
 
 
-class AuthorPostSubmitAPITests(APITestCase):
+class AuthorPostPublishAPITests(APITestCase):
     @classmethod
     def setUpTestData(cls):
         user_model = get_user_model()
         cls.author = user_model.objects.create_user(
-            username='submit-author',
+            username='publish-author',
             password='StrongPassword123!',
         )
         cls.other_author = user_model.objects.create_user(
-            username='submit-other-author',
+            username='publish-other-author',
             password='StrongPassword123!',
         )
         cls.draft_post = Post.objects.create(
@@ -1573,27 +1605,16 @@ class AuthorPostSubmitAPITests(APITestCase):
             author=cls.author,
             status=Post.Status.DRAFT,
         )
-        cls.rejected_post = Post.objects.create(
-            title='Corrected rejected post',
+        cls.removed_post = Post.objects.create(
+            title='Corrected removed post',
             author=cls.author,
-            status=Post.Status.REJECTED,
+            status=Post.Status.REMOVED,
             review_feedback='Improve the conclusion.',
-        )
-        cls.in_review_post = Post.objects.create(
-            title='Already in review',
-            author=cls.author,
-            status=Post.Status.IN_REVIEW,
         )
         cls.published_post = Post.objects.create(
             title='Already published',
             author=cls.author,
             status=Post.Status.PUBLISHED,
-        )
-        cls.scheduled_post = Post.objects.create(
-            title='Already scheduled',
-            author=cls.author,
-            status=Post.Status.SCHEDULED,
-            published_at=timezone.now() + timedelta(days=1),
         )
         cls.archived_post = Post.objects.create(
             title='Archived post',
@@ -1607,20 +1628,20 @@ class AuthorPostSubmitAPITests(APITestCase):
             featured_image='posts/missing-alt.jpg',
         )
         cls.other_post = Post.objects.create(
-            title='Another author draft for review',
+            title='Another author draft',
             author=cls.other_author,
             status=Post.Status.DRAFT,
         )
 
     @staticmethod
-    def submit_url(post):
+    def publish_url(post):
         return reverse(
-            'blog:author-post-submit',
+            'blog:author-post-publish',
             kwargs={'pk': post.pk},
         )
 
-    def test_anonymous_visitor_cannot_submit_post(self):
-        response = self.client.post(self.submit_url(self.draft_post))
+    def test_anonymous_visitor_cannot_publish_post(self):
+        response = self.client.post(self.publish_url(self.draft_post))
 
         self.assertEqual(
             response.status_code,
@@ -1629,48 +1650,47 @@ class AuthorPostSubmitAPITests(APITestCase):
         self.draft_post.refresh_from_db()
         self.assertEqual(self.draft_post.status, Post.Status.DRAFT)
 
-    def test_author_can_submit_draft_for_review(self):
+    def test_author_can_publish_draft_immediately(self):
         self.client.force_login(self.author)
 
-        response = self.client.post(self.submit_url(self.draft_post))
+        response = self.client.post(self.publish_url(self.draft_post))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.draft_post.refresh_from_db()
         self.assertEqual(
             self.draft_post.status,
-            Post.Status.IN_REVIEW,
+            Post.Status.PUBLISHED,
         )
         self.assertEqual(
             response.data['status'],
-            Post.Status.IN_REVIEW,
+            Post.Status.PUBLISHED,
         )
+        self.assertIsNotNone(self.draft_post.published_at)
 
-    def test_author_can_resubmit_rejected_post_and_feedback_is_cleared(self):
+    def test_author_can_republish_removed_post_and_feedback_is_cleared(self):
         self.client.force_login(self.author)
 
-        response = self.client.post(self.submit_url(self.rejected_post))
+        response = self.client.post(self.publish_url(self.removed_post))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.rejected_post.refresh_from_db()
+        self.removed_post.refresh_from_db()
         self.assertEqual(
-            self.rejected_post.status,
-            Post.Status.IN_REVIEW,
+            self.removed_post.status,
+            Post.Status.PUBLISHED,
         )
-        self.assertEqual(self.rejected_post.review_feedback, '')
+        self.assertEqual(self.removed_post.review_feedback, '')
         self.assertEqual(response.data['review_feedback'], '')
 
-    def test_posts_in_other_statuses_cannot_be_submitted(self):
+    def test_posts_in_other_statuses_cannot_be_published(self):
         self.client.force_login(self.author)
         invalid_posts = (
-            self.in_review_post,
             self.published_post,
-            self.scheduled_post,
             self.archived_post,
         )
 
         for post in invalid_posts:
             with self.subTest(post_status=post.status):
-                response = self.client.post(self.submit_url(post))
+                response = self.client.post(self.publish_url(post))
 
                 self.assertEqual(
                     response.status_code,
@@ -1680,10 +1700,10 @@ class AuthorPostSubmitAPITests(APITestCase):
                 post.refresh_from_db()
                 self.assertNotEqual(post.status, Post.Status.DRAFT)
 
-    def test_invalid_draft_cannot_enter_review_queue(self):
+    def test_invalid_draft_cannot_be_published(self):
         self.client.force_login(self.author)
 
-        response = self.client.post(self.submit_url(self.invalid_draft))
+        response = self.client.post(self.publish_url(self.invalid_draft))
 
         self.assertEqual(
             response.status_code,
@@ -1696,10 +1716,10 @@ class AuthorPostSubmitAPITests(APITestCase):
             Post.Status.DRAFT,
         )
 
-    def test_author_cannot_submit_another_authors_post(self):
+    def test_author_cannot_publish_another_authors_post(self):
         self.client.force_login(self.author)
 
-        response = self.client.post(self.submit_url(self.other_post))
+        response = self.client.post(self.publish_url(self.other_post))
 
         self.assertEqual(
             response.status_code,
@@ -1708,11 +1728,11 @@ class AuthorPostSubmitAPITests(APITestCase):
         self.other_post.refresh_from_db()
         self.assertEqual(self.other_post.status, Post.Status.DRAFT)
 
-    def test_submit_requires_csrf_token(self):
+    def test_publish_requires_csrf_token(self):
         csrf_client = APIClient(enforce_csrf_checks=True)
         csrf_client.force_login(self.author)
 
-        response = csrf_client.post(self.submit_url(self.draft_post))
+        response = csrf_client.post(self.publish_url(self.draft_post))
 
         self.assertEqual(
             response.status_code,
@@ -1724,7 +1744,7 @@ class AuthorPostSubmitAPITests(APITestCase):
     def test_get_method_is_not_allowed(self):
         self.client.force_login(self.author)
 
-        response = self.client.get(self.submit_url(self.draft_post))
+        response = self.client.get(self.publish_url(self.draft_post))
 
         self.assertEqual(
             response.status_code,
@@ -1759,10 +1779,10 @@ class AuthorPostBlockAPITests(APITestCase):
             author=cls.author,
             status=Post.Status.PUBLISHED,
         )
-        cls.rejected_post = Post.objects.create(
-            title='Rejected block editor post',
+        cls.removed_post = Post.objects.create(
+            title='Removed block editor post',
             author=cls.author,
-            status=Post.Status.REJECTED,
+            status=Post.Status.REMOVED,
             review_feedback='Add another section.',
         )
         cls.other_post = Post.objects.create(
@@ -1818,6 +1838,13 @@ class AuthorPostBlockAPITests(APITestCase):
                 'post_pk': post.pk,
                 'pk': block.pk,
             },
+        )
+
+    @staticmethod
+    def block_reorder_url(post):
+        return reverse(
+            'blog:author-post-block-reorder',
+            kwargs={'post_pk': post.pk},
         )
 
     def test_anonymous_visitor_cannot_list_private_blocks(self):
@@ -1928,6 +1955,47 @@ class AuthorPostBlockAPITests(APITestCase):
         self.assertEqual(block.block_type, PostBlock.BlockType.DIVIDER)
         self.assertEqual(block.content, '')
 
+    def test_author_can_upload_an_accessible_image_block(self):
+        self.client.force_login(self.author)
+        image_bytes = (
+            b'GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00'
+            b'\xff\xff\xff!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00'
+            b'\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;'
+        )
+        image = SimpleUploadedFile(
+            'architecture.gif',
+            image_bytes,
+            content_type='image/gif',
+        )
+
+        with tempfile.TemporaryDirectory() as media_root:
+            with self.settings(MEDIA_ROOT=media_root):
+                response = self.client.post(
+                    self.block_list_url(self.draft_post),
+                    {
+                        'block_type': PostBlock.BlockType.IMAGE,
+                        'position': 1,
+                        'image': image,
+                        'image_alt': 'Application request flow',
+                        'caption': 'Django and React communication',
+                        'image_width': PostBlock.ImageWidth.WIDE,
+                    },
+                    format='multipart',
+                )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+        self.assertEqual(
+            response.data['image_alt'],
+            'Application request flow',
+        )
+        self.assertEqual(
+            response.data['image_width'],
+            PostBlock.ImageWidth.WIDE,
+        )
+
     def test_author_can_update_and_reorder_owned_block(self):
         self.client.force_login(self.author)
 
@@ -1944,6 +2012,84 @@ class AuthorPostBlockAPITests(APITestCase):
         self.last_block.refresh_from_db()
         self.assertEqual(self.last_block.position, 1)
         self.assertEqual(self.last_block.content, 'Updated quote')
+
+    def test_author_can_atomically_reorder_all_owned_blocks(self):
+        self.client.force_login(self.author)
+
+        response = self.client.put(
+            self.block_reorder_url(self.draft_post),
+            {
+                'block_ids': [
+                    self.last_block.pk,
+                    self.first_block.pk,
+                ],
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [block_data['id'] for block_data in response.data],
+            [self.last_block.pk, self.first_block.pk],
+        )
+        self.last_block.refresh_from_db()
+        self.first_block.refresh_from_db()
+        self.assertEqual(self.last_block.position, 0)
+        self.assertEqual(self.first_block.position, 1)
+
+    def test_reorder_requires_each_post_block_exactly_once(self):
+        self.client.force_login(self.author)
+        original_positions = {
+            self.first_block.pk: self.first_block.position,
+            self.last_block.pk: self.last_block.position,
+        }
+
+        for block_ids in (
+            [self.first_block.pk],
+            [self.first_block.pk, self.first_block.pk],
+            [self.first_block.pk, self.other_block.pk],
+        ):
+            with self.subTest(block_ids=block_ids):
+                response = self.client.put(
+                    self.block_reorder_url(self.draft_post),
+                    {'block_ids': block_ids},
+                    format='json',
+                )
+
+                self.assertEqual(
+                    response.status_code,
+                    status.HTTP_400_BAD_REQUEST,
+                )
+                self.assertIn('block_ids', response.data)
+
+        self.first_block.refresh_from_db()
+        self.last_block.refresh_from_db()
+        self.assertEqual(
+            {
+                self.first_block.pk: self.first_block.position,
+                self.last_block.pk: self.last_block.position,
+            },
+            original_positions,
+        )
+
+    def test_other_author_cannot_reorder_post_blocks(self):
+        self.client.force_login(self.other_author)
+
+        response = self.client.put(
+            self.block_reorder_url(self.draft_post),
+            {
+                'block_ids': [
+                    self.last_block.pk,
+                    self.first_block.pk,
+                ],
+            },
+            format='json',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
 
     def test_changing_block_type_requires_new_types_data(self):
         self.client.force_login(self.author)
@@ -2006,7 +2152,7 @@ class AuthorPostBlockAPITests(APITestCase):
             status.HTTP_404_NOT_FOUND,
         )
 
-    def test_editing_published_post_block_returns_post_to_review(self):
+    def test_editing_published_post_block_keeps_post_public(self):
         self.published_post.refresh_from_db()
         self.client.force_login(self.author)
 
@@ -2023,16 +2169,16 @@ class AuthorPostBlockAPITests(APITestCase):
         self.published_post.refresh_from_db()
         self.assertEqual(
             self.published_post.status,
-            Post.Status.IN_REVIEW,
+            Post.Status.PUBLISHED,
         )
-        self.assertFalse(self.published_post.is_public)
+        self.assertTrue(self.published_post.is_public)
 
-    def test_adding_block_to_rejected_post_returns_post_to_draft(self):
-        self.rejected_post.refresh_from_db()
+    def test_adding_block_to_removed_post_returns_post_to_draft(self):
+        self.removed_post.refresh_from_db()
         self.client.force_login(self.author)
 
         response = self.client.post(
-            self.block_list_url(self.rejected_post),
+            self.block_list_url(self.removed_post),
             {
                 'block_type': PostBlock.BlockType.RICH_TEXT,
                 'content': 'A new section',
@@ -2044,17 +2190,17 @@ class AuthorPostBlockAPITests(APITestCase):
             response.status_code,
             status.HTTP_201_CREATED,
         )
-        self.rejected_post.refresh_from_db()
+        self.removed_post.refresh_from_db()
         self.assertEqual(
-            self.rejected_post.status,
+            self.removed_post.status,
             Post.Status.DRAFT,
         )
         self.assertEqual(
-            self.rejected_post.review_feedback,
+            self.removed_post.review_feedback,
             'Add another section.',
         )
 
-    def test_deleting_published_block_returns_post_to_review(self):
+    def test_deleting_published_block_keeps_post_public(self):
         self.published_delete_post.refresh_from_db()
         self.client.force_login(self.author)
 
@@ -2077,7 +2223,7 @@ class AuthorPostBlockAPITests(APITestCase):
         self.published_delete_post.refresh_from_db()
         self.assertEqual(
             self.published_delete_post.status,
-            Post.Status.IN_REVIEW,
+            Post.Status.PUBLISHED,
         )
 
     def test_block_creation_requires_csrf_token(self):
@@ -2117,16 +2263,6 @@ class PostModelTests(TestCase):
         self.assertIsNotNone(post.published_at)
         self.assertTrue(post.is_public)
 
-    def test_scheduled_post_requires_a_publication_time(self):
-        post = Post(
-            title='Scheduled post',
-            content='Text',
-            status=Post.Status.SCHEDULED,
-        )
-
-        with self.assertRaises(ValidationError):
-            post.full_clean()
-
     def test_published_queryset_excludes_drafts_and_future_posts(self):
         public_post = Post.objects.create(
             title='Public',
@@ -2137,17 +2273,17 @@ class PostModelTests(TestCase):
         Post.objects.create(
             title='Future',
             content='Text',
-            status=Post.Status.SCHEDULED,
+            status=Post.Status.PUBLISHED,
             published_at=timezone.now() + timedelta(days=1),
         )
 
         self.assertEqual(list(Post.objects.published()), [public_post])
 
-    def test_due_scheduled_post_is_public(self):
+    def test_published_post_with_due_publication_time_is_public(self):
         post = Post.objects.create(
-            title='Due scheduled post',
+            title='Published post',
             content='Text',
-            status=Post.Status.SCHEDULED,
+            status=Post.Status.PUBLISHED,
             published_at=timezone.now() - timedelta(minutes=1),
         )
 

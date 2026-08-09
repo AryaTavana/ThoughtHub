@@ -15,13 +15,34 @@ import {
 } from './auth/auth-context'
 
 vi.mock('./api/posts', () => ({
+  getAuthorPost: vi.fn(
+    () => new Promise(() => {}),
+  ),
   getAuthorPosts: vi.fn(
+    () => new Promise(() => {}),
+  ),
+  getCategories: vi.fn(
     () => new Promise(() => {}),
   ),
   getPublishedPost: vi.fn(
     () => new Promise(() => {}),
   ),
   getPublishedPosts: vi.fn(
+    () => new Promise(() => {}),
+  ),
+  getTags: vi.fn(
+    () => new Promise(() => {}),
+  ),
+}))
+
+vi.mock('./api/comments', () => ({
+  getAuthorComments: vi.fn(
+    () => new Promise(() => {}),
+  ),
+  getPostComments: vi.fn(
+    () => new Promise(() => {}),
+  ),
+  submitPostComment: vi.fn(
     () => new Promise(() => {}),
   ),
 }))
@@ -125,8 +146,22 @@ describe('application routes', () => {
     expect(
       screen.getByRole('heading', { name: 'Your posts' }),
     ).toBeInTheDocument()
+    expect(
+      screen.getByText('Loading your posts…'),
+    ).toBeInTheDocument()
+  })
+
+  it.each([
+    '/dashboard/posts/new',
+    '/dashboard/posts/12/edit',
+  ])('protects and renders the post editor route %s', (path) => {
+    renderRoute(path, {
+      user: currentUser,
+      isAuthenticated: true,
+    })
+
     expect(screen.getByRole('status')).toHaveTextContent(
-      'Loading your posts…',
+      'Loading post editor…',
     )
   })
 

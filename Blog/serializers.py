@@ -180,6 +180,36 @@ class CommentCreateSerializer(serializers.ModelSerializer):
         return value
 
 
+class AuthorCommentSerializer(serializers.ModelSerializer):
+    post_title = serializers.CharField(
+        source='post.title',
+        read_only=True,
+    )
+    post_slug = serializers.CharField(
+        source='post.slug',
+        read_only=True,
+    )
+    post_status = serializers.CharField(
+        source='post.status',
+        read_only=True,
+    )
+
+    class Meta:
+        model = Comment
+        fields = (
+            'id',
+            'post_title',
+            'post_slug',
+            'post_status',
+            'content',
+            'status',
+            'moderation_feedback',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = fields
+
+
 class PublicPostListSerializer(serializers.ModelSerializer):
     reading_time = serializers.IntegerField(read_only=True)
     author_username = serializers.CharField(

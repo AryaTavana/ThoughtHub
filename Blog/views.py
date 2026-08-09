@@ -1,6 +1,8 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.db.models import F
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework.generics import (
     ListAPIView,
     ListCreateAPIView,
@@ -17,6 +19,7 @@ from rest_framework.views import APIView
 
 from .models import Category, Comment, Post, PostBlock, Tag
 from .serializers import (
+    AuthorCommentSerializer,
     AuthorPostBlockSerializer,
     AuthorPostListSerializer,
     AuthorPostWriteSerializer,
@@ -88,11 +91,15 @@ class PublicPostCommentListCreateView(ListCreateAPIView):
                 'Comments are closed for this post.',
             )
 
-        serializer.save(
-            post=post,
-            author=self.request.user,
-            status=Comment.Status.PENDING,
-        )
+        with transaction.atomic():
+            serializer.save(
+                post=post,
+                author=self.request.user,
+                status=Comment.Status.APPROVED,
+            )
+            Post.objects.filter(pk=post.pk).update(
+                comments=F('comments') + 1,
+            )
 
 
 class PublicPostDetailView(RetrieveAPIView):
@@ -120,6 +127,18 @@ class TagListView(ListAPIView):
     serializer_class = TagSerializer
     permission_classes = (AllowAny,)
     pagination_class = None
+
+
+class AuthorCommentListView(ListAPIView):
+    serializer_class = AuthorCommentSerializer
+    permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        return (
+            Comment.objects.filter(author=self.request.user)
+            .select_related('post')
+            .order_by('-created_at')
+        )
 
 
 class AuthorPostListView(ListCreateAPIView):
@@ -226,7 +245,73 @@ class AuthorPostBlockDetailView(RetrieveUpdateDestroyAPIView):
             _mark_post_as_edited(post)
 
 
-class AuthorPostSubmitView(APIView):
+class AuthorPostBlockReorderView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def put(self, request, post_pk):
+        block_ids = request.data.get('block_ids')
+
+        if (
+            not isinstance(block_ids, list)
+            or any(
+                not isinstance(block_id, int)
+                or isinstance(block_id, bool)
+                for block_id in block_ids
+            )
+        ):
+            raise APIValidationError({
+                'block_ids': 'Provide an ordered list of block IDs.',
+            })
+
+        with transaction.atomic():
+            post = get_object_or_404(
+                Post.objects.select_for_update(),
+                pk=post_pk,
+                author=request.user,
+            )
+            blocks = list(
+                PostBlock.objects.select_for_update().filter(post=post)
+            )
+            blocks_by_id = {block.pk: block for block in blocks}
+
+            if (
+                len(block_ids) != len(blocks_by_id)
+                or set(block_ids) != set(blocks_by_id)
+            ):
+                raise APIValidationError({
+                    'block_ids': (
+                        'Provide every block for this post exactly once.'
+                    ),
+                })
+
+            updated_at = timezone.now()
+            ordered_blocks = []
+            has_changes = False
+
+            for position, block_id in enumerate(block_ids):
+                block = blocks_by_id[block_id]
+                if block.position != position:
+                    has_changes = True
+                block.position = position
+                block.updated_at = updated_at
+                ordered_blocks.append(block)
+
+            if has_changes:
+                PostBlock.objects.bulk_update(
+                    ordered_blocks,
+                    ('position', 'updated_at'),
+                )
+                _mark_post_as_edited(post)
+
+        serializer = AuthorPostBlockSerializer(
+            ordered_blocks,
+            many=True,
+            context={'request': request},
+        )
+        return Response(serializer.data)
+
+
+class AuthorPostPublishView(APIView):
     permission_classes = (IsAuthenticated,)
 
     def post(self, request, pk):
@@ -238,7 +323,7 @@ class AuthorPostSubmitView(APIView):
         post = get_object_or_404(queryset, pk=pk)
 
         try:
-            post.submit_for_review()
+            post.publish()
             post.full_clean()
         except DjangoValidationError as error:
             details = (
@@ -252,6 +337,7 @@ class AuthorPostSubmitView(APIView):
             update_fields=(
                 'status',
                 'review_feedback',
+                'published_at',
                 'updated_at',
             ),
         )

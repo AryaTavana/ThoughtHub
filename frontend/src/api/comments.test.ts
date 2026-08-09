@@ -7,8 +7,10 @@ import {
 } from 'vitest'
 
 import {
+  getAuthorComments,
   getPostComments,
   submitPostComment,
+  type AuthorCommentListItem,
   type PublicComment,
   type SubmittedComment,
 } from './comments'
@@ -41,11 +43,11 @@ const approvedComments: PaginatedResponse<PublicComment> = {
   ],
 }
 
-const pendingComment: SubmittedComment = {
+const publishedComment: SubmittedComment = {
   id: 20,
   author_username: 'arya',
   content: 'A thoughtful response.',
-  status: 'pending',
+  status: 'approved',
   moderation_feedback: '',
   created_at: '2026-07-30T10:30:00Z',
 }
@@ -99,24 +101,52 @@ describe('comments API service', () => {
     )
   })
 
-  it('submits comment content as JSON and returns its pending state', async () => {
+  it('submits comment content as JSON and returns its published state', async () => {
     const submission = {
       content: 'A thoughtful response.',
     }
-    apiRequestMock.mockResolvedValue(pendingComment)
+    apiRequestMock.mockResolvedValue(publishedComment)
 
     await expect(
       submitPostComment(
         'learning-django-and-react',
         submission,
       ),
-    ).resolves.toEqual(pendingComment)
+    ).resolves.toEqual(publishedComment)
     expect(apiRequestMock).toHaveBeenCalledWith(
       '/api/posts/learning-django-and-react/comments/',
       {
         method: 'POST',
         body: JSON.stringify(submission),
       },
+    )
+  })
+
+  it('loads the author comment history with moderation feedback', async () => {
+    const comment: AuthorCommentListItem = {
+      id: 30,
+      post_title: 'Campus technology',
+      post_slug: 'campus-technology',
+      post_status: 'published',
+      content: 'A removed comment.',
+      status: 'removed',
+      moderation_feedback: 'Please keep comments on topic.',
+      created_at: '2026-07-30T10:00:00Z',
+      updated_at: '2026-07-30T11:00:00Z',
+    }
+    const page: PaginatedResponse<AuthorCommentListItem> = {
+      count: 1,
+      next: null,
+      previous: null,
+      results: [comment],
+    }
+    apiRequestMock.mockResolvedValue(page)
+
+    await expect(
+      getAuthorComments({ page: 2 }),
+    ).resolves.toEqual(page)
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/api/dashboard/comments/?page=2',
     )
   })
 

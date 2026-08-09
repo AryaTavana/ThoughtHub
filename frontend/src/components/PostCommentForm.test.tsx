@@ -61,11 +61,11 @@ const signedInAuth: AuthContextValue = {
   isAuthenticated: true,
 }
 
-const pendingComment: SubmittedComment = {
+const publishedComment: SubmittedComment = {
   id: 20,
   author_username: 'arya',
   content: 'A thoughtful response.',
-  status: 'pending',
+  status: 'approved',
   moderation_feedback: '',
   created_at: '2026-07-30T10:30:00Z',
 }
@@ -119,7 +119,7 @@ function renderOpenForm(
 describe('PostCommentForm', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    submitPostCommentMock.mockResolvedValue(pendingComment)
+    submitPostCommentMock.mockResolvedValue(publishedComment)
   })
 
   it('shows the closed state without requiring authentication context', () => {
@@ -198,7 +198,7 @@ describe('PostCommentForm', () => {
     ).toBeInTheDocument()
     expect(
       screen.getByRole('button', {
-        name: 'Submit comment',
+        name: 'Publish comment',
       }),
     ).toBeEnabled()
   })
@@ -213,7 +213,7 @@ describe('PostCommentForm', () => {
     )
     await user.click(
       screen.getByRole('button', {
-        name: 'Submit comment',
+        name: 'Publish comment',
       }),
     )
 
@@ -226,7 +226,7 @@ describe('PostCommentForm', () => {
     ).toHaveAttribute('aria-invalid', 'true')
   })
 
-  it('submits content, clears the form, and shows moderation confirmation', async () => {
+  it('publishes content, clears the form, and confirms publication', async () => {
     const user = userEvent.setup()
     renderOpenForm(signedInAuth)
     const textarea = screen.getByRole('textbox', {
@@ -236,7 +236,7 @@ describe('PostCommentForm', () => {
     await user.type(textarea, 'A thoughtful response.')
     await user.click(
       screen.getByRole('button', {
-        name: 'Submit comment',
+        name: 'Publish comment',
       }),
     )
 
@@ -247,7 +247,7 @@ describe('PostCommentForm', () => {
       },
     )
     expect(await screen.findByRole('status')).toHaveTextContent(
-      'Your comment was submitted and is waiting for moderation.',
+      'Your comment is now published.',
     )
     expect(textarea).toHaveValue('')
     expect(
@@ -274,7 +274,7 @@ describe('PostCommentForm', () => {
     )
     await user.click(
       screen.getByRole('button', {
-        name: 'Submit comment',
+        name: 'Publish comment',
       }),
     )
 
@@ -304,7 +304,7 @@ describe('PostCommentForm', () => {
     await user.type(textarea, 'Keep this draft.')
     await user.click(
       screen.getByRole('button', {
-        name: 'Submit comment',
+        name: 'Publish comment',
       }),
     )
 
@@ -332,19 +332,19 @@ describe('PostCommentForm', () => {
     )
     await user.click(
       screen.getByRole('button', {
-        name: 'Submit comment',
+        name: 'Publish comment',
       }),
     )
 
     expect(
-      screen.getByRole('button', { name: 'Submitting…' }),
+      screen.getByRole('button', { name: 'Publishing…' }),
     ).toBeDisabled()
     expect(
       screen.getByRole('textbox', { name: 'Comment' }),
     ).toBeDisabled()
 
     await act(async () => {
-      resolveSubmission(pendingComment)
+      resolveSubmission(publishedComment)
     })
   })
 

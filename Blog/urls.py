@@ -1,11 +1,13 @@
 from django.urls import path
 
 from .views import (
+    AuthorCommentListView,
     AuthorPostBlockDetailView,
     AuthorPostBlockListCreateView,
+    AuthorPostBlockReorderView,
     AuthorPostDetailView,
     AuthorPostListView,
-    AuthorPostSubmitView,
+    AuthorPostPublishView,
     CategoryListView,
     PublicPostCommentListCreateView,
     PublicPostDetailView,
@@ -39,19 +41,29 @@ urlpatterns = [
     ),
     path('dashboard/posts/', AuthorPostListView.as_view(), name='author-post-list'),
     path(
+        'dashboard/comments/',
+        AuthorCommentListView.as_view(),
+        name='author-comment-list',
+    ),
+    path(
         'dashboard/posts/<int:pk>/',
         AuthorPostDetailView.as_view(),
         name='author-post-detail',
     ),
     path(
-        'dashboard/posts/<int:pk>/submit/',
-        AuthorPostSubmitView.as_view(),
-        name='author-post-submit',
+        'dashboard/posts/<int:pk>/publish/',
+        AuthorPostPublishView.as_view(),
+        name='author-post-publish',
     ),
     path(
         'dashboard/posts/<int:post_pk>/blocks/',
         AuthorPostBlockListCreateView.as_view(),
         name='author-post-block-list',
+    ),
+    path(
+        'dashboard/posts/<int:post_pk>/blocks/reorder/',
+        AuthorPostBlockReorderView.as_view(),
+        name='author-post-block-reorder',
     ),
     path(
         'dashboard/posts/<int:post_pk>/blocks/<int:pk>/',

@@ -192,7 +192,7 @@ describe('PublicPostDetailPage', () => {
       screen.getByText('ThoughtHub editor'),
     ).toBeInTheDocument()
     expect(
-      await screen.findByText('No approved comments yet.'),
+      await screen.findByText('No comments yet.'),
     ).toBeInTheDocument()
     expect(
       screen.getByText('Comments are closed for this post.'),

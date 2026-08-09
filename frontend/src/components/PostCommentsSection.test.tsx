@@ -31,13 +31,20 @@ vi.mock('./PostCommentForm', () => ({
   PostCommentForm: ({
     slug,
     allowComments,
+    onCommentPublished,
   }: {
     slug: string
     allowComments: boolean
+    onCommentPublished?: () => void
   }) => (
-    <div data-testid="comment-form-props">
-      {slug}:{String(allowComments)}
-    </div>
+    <>
+      <div data-testid="comment-form-props">
+        {slug}:{String(allowComments)}
+      </div>
+      <button type="button" onClick={onCommentPublished}>
+        Simulate published comment
+      </button>
+    </>
   ),
 }))
 
@@ -156,7 +163,7 @@ describe('PostCommentsSection', () => {
     ).toBeInTheDocument()
   })
 
-  it('renders an empty state when no comments are approved', async () => {
+  it('renders an empty state when there are no comments', async () => {
     render(
       <PostCommentsSection
         slug="example"
@@ -165,7 +172,7 @@ describe('PostCommentsSection', () => {
     )
 
     expect(
-      await screen.findByText('No approved comments yet.'),
+      await screen.findByText('No comments yet.'),
     ).toBeInTheDocument()
     expect(
       screen.queryByRole('navigation', {
@@ -201,8 +208,31 @@ describe('PostCommentsSection', () => {
 
     expect(getPostCommentsMock).toHaveBeenCalledTimes(2)
     expect(
-      await screen.findByText('No approved comments yet.'),
+      await screen.findByText('No comments yet.'),
     ).toBeInTheDocument()
+  })
+
+  it('reloads the first page after a comment is published', async () => {
+    const user = userEvent.setup()
+    render(
+      <PostCommentsSection
+        slug="example"
+        allowComments
+      />,
+    )
+
+    await screen.findByText('No comments yet.')
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Simulate published comment',
+      }),
+    )
+
+    expect(getPostCommentsMock).toHaveBeenCalledTimes(2)
+    expect(getPostCommentsMock).toHaveBeenLastCalledWith(
+      'example',
+      { page: 1 },
+    )
   })
 
   it('loads next and previous comment pages', async () => {

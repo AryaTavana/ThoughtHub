@@ -9,6 +9,7 @@ import {
 } from 'react-router-dom'
 
 import {submitPostComment} from '../api/comments'
+import type {SubmittedComment} from '../api/comments'
 import {
     getApiErrorMessage,
     getApiFieldErrors,
@@ -18,14 +19,17 @@ import {useAuth} from '../auth/useAuth'
 interface PostCommentFormProps {
     slug: string
     allowComments: boolean
+    onCommentPublished?: (comment: SubmittedComment) => void
 }
 
 interface OpenPostCommentFormProps {
     slug: string
+    onCommentPublished?: (comment: SubmittedComment) => void
 }
 
 function AuthenticatedPostCommentForm({
     slug,
+    onCommentPublished,
 }: OpenPostCommentFormProps) {
     const [content, setContent] = useState('')
     const [contentError, setContentError] =
@@ -63,11 +67,13 @@ function AuthenticatedPostCommentForm({
         setIsSubmitting(true)
 
         try {
-            await submitPostComment(slug, {content})
-            setContent('')
-            setConfirmation(
-                'Your comment was submitted and is waiting for moderation.',
+            const publishedComment = await submitPostComment(
+                slug,
+                {content},
             )
+            setContent('')
+            setConfirmation('Your comment is now published.')
+            onCommentPublished?.(publishedComment)
         } catch (error) {
             const fieldErrors = getApiFieldErrors(error)
             const apiContentError =
@@ -100,8 +106,8 @@ function AuthenticatedPostCommentForm({
                 </h3>
 
                 <p className="text-secondary">
-                    Comments are reviewed before they become
-                    public.
+                    Comments publish immediately. Moderators may
+                    remove comments that break the community rules.
                 </p>
 
                 {confirmation && (
@@ -179,8 +185,8 @@ function AuthenticatedPostCommentForm({
                         disabled={isSubmitting}
                     >
                         {isSubmitting
-                            ? 'Submitting…'
-                            : 'Submit comment'}
+                            ? 'Publishing…'
+                            : 'Publish comment'}
                     </button>
                 </form>
             </div>
@@ -190,6 +196,7 @@ function AuthenticatedPostCommentForm({
 
 function OpenPostCommentForm({
     slug,
+    onCommentPublished,
 }: OpenPostCommentFormProps) {
     const {
         isAuthenticated,
@@ -231,12 +238,18 @@ function OpenPostCommentForm({
         )
     }
 
-    return <AuthenticatedPostCommentForm slug={slug}/>
+    return (
+        <AuthenticatedPostCommentForm
+            slug={slug}
+            onCommentPublished={onCommentPublished}
+        />
+    )
 }
 
 export function PostCommentForm({
     slug,
     allowComments,
+    onCommentPublished,
 }: PostCommentFormProps) {
     if (!allowComments) {
         return (
@@ -249,5 +262,10 @@ export function PostCommentForm({
         )
     }
 
-    return <OpenPostCommentForm slug={slug}/>
+    return (
+        <OpenPostCommentForm
+            slug={slug}
+            onCommentPublished={onCommentPublished}
+        />
+    )
 }

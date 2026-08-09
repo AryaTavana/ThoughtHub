@@ -1,5 +1,6 @@
 import {apiRequest} from './client'
 import type {PaginatedResponse} from './pagination'
+import type {PostStatus} from './posts'
 
 export interface PublicComment {
     id: number
@@ -10,8 +11,20 @@ export interface PublicComment {
 
 export interface SubmittedComment
     extends PublicComment {
-    status: 'pending'
+    status: 'approved'
     moderation_feedback: string
+}
+
+export interface AuthorCommentListItem {
+    id: number
+    post_title: string
+    post_slug: string
+    post_status: PostStatus
+    content: string
+    status: 'approved' | 'removed'
+    moderation_feedback: string
+    created_at: string
+    updated_at: string
 }
 
 export interface CommentSubmission {
@@ -63,4 +76,26 @@ export function submitPostComment(
             body: JSON.stringify(submission),
         },
     )
+}
+
+export function getAuthorComments(
+    parameters: CommentListParameters = {},
+): Promise<PaginatedResponse<AuthorCommentListItem>> {
+    const searchParameters = new URLSearchParams()
+
+    if (parameters.page !== undefined) {
+        searchParameters.set(
+            'page',
+            String(parameters.page),
+        )
+    }
+
+    const queryString = searchParameters.toString()
+    const path = queryString
+        ? `/api/dashboard/comments/?${queryString}`
+        : '/api/dashboard/comments/'
+
+    return apiRequest<
+        PaginatedResponse<AuthorCommentListItem>
+    >(path)
 }

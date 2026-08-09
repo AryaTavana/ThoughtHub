@@ -10,6 +10,7 @@ import {
     type AuthorPostListItem,
     type PaginatedResponse,
 } from '../api/posts'
+import {AuthorCommentsPanel} from '../components/AuthorCommentsPanel'
 
 const updatedDateFormatter = new Intl.DateTimeFormat(
     undefined,
@@ -77,11 +78,20 @@ export function DashboardPage() {
 
     return (
         <section className="container py-5">
-            <header className="mb-5">
-                <h1>Your posts</h1>
-                <p className="lead text-secondary mb-0">
-                    Create, review, and manage your writing.
-                </p>
+            <header className="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-5">
+                <div>
+                    <h1>Your posts</h1>
+                    <p className="lead text-secondary mb-0">
+                        Create, publish, and manage your writing.
+                    </p>
+                </div>
+
+                <Link
+                    className="btn btn-primary"
+                    to="/dashboard/posts/new"
+                >
+                    New post
+                </Link>
             </header>
 
             {isLoading && (
@@ -122,6 +132,12 @@ export function DashboardPage() {
                         <p className="text-secondary">
                             Your first draft will appear here.
                         </p>
+                        <Link
+                            className="btn btn-primary"
+                            to="/dashboard/posts/new"
+                        >
+                            Create your first post
+                        </Link>
                     </div>
                 )}
 
@@ -157,15 +173,24 @@ export function DashboardPage() {
                                             </span>
                                         </div>
 
-                                        {post.status ===
-                                            'published' && (
-                                                <Link
-                                                    to={`/posts/${post.slug}`}
-                                                    className="btn btn-sm btn-outline-primary align-self-start"
-                                                >
-                                                    View
-                                                </Link>
-                                            )}
+                                        <div className="d-flex gap-2 align-self-start">
+                                            <Link
+                                                to={`/dashboard/posts/${post.id}/edit`}
+                                                className="btn btn-sm btn-outline-secondary"
+                                            >
+                                                Edit
+                                            </Link>
+
+                                            {post.status ===
+                                                'published' && (
+                                                    <Link
+                                                        to={`/posts/${post.slug}`}
+                                                        className="btn btn-sm btn-outline-primary"
+                                                    >
+                                                        View
+                                                    </Link>
+                                                )}
+                                        </div>
                                     </div>
 
                                     <p className="small text-secondary mt-3 mb-0">
@@ -178,7 +203,7 @@ export function DashboardPage() {
                                     {post.review_feedback && (
                                         <div className="alert alert-warning mt-3 mb-0">
                                             <strong>
-                                                Editor feedback:
+                                                Moderation feedback:
                                             </strong>{' '}
                                             {post.review_feedback}
                                         </div>
@@ -224,6 +249,7 @@ export function DashboardPage() {
                         )}
                     </>
                 )}
+            <AuthorCommentsPanel/>
         </section>
     )
 }

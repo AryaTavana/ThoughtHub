@@ -18,6 +18,10 @@ import {
 } from 'vitest'
 
 import {
+  getAuthorComments,
+  type AuthorCommentListItem,
+} from '../api/comments'
+import {
   getAuthorPosts,
   type AuthorPostListItem,
   type PaginatedResponse,
@@ -28,7 +32,12 @@ vi.mock('../api/posts', () => ({
   getAuthorPosts: vi.fn(),
 }))
 
+vi.mock('../api/comments', () => ({
+  getAuthorComments: vi.fn(),
+}))
+
 const getAuthorPostsMock = vi.mocked(getAuthorPosts)
+const getAuthorCommentsMock = vi.mocked(getAuthorComments)
 
 const publishedPost: AuthorPostListItem = {
   id: 12,
@@ -59,13 +68,13 @@ const publishedPost: AuthorPostListItem = {
   updated_at: '2026-07-30T09:30:00Z',
 }
 
-const rejectedPost: AuthorPostListItem = {
+const removedPost: AuthorPostListItem = {
   ...publishedPost,
   id: 13,
   title: 'Article needing revision',
   slug: 'article-needing-revision',
   published_at: null,
-  status: 'rejected',
+  status: 'removed',
   review_feedback: 'Please add sources for the main claim.',
   updated_at: '2026-07-30T10:00:00Z',
 }
@@ -74,10 +83,17 @@ const postsPage: PaginatedResponse<AuthorPostListItem> = {
   count: 2,
   next: null,
   previous: null,
-  results: [publishedPost, rejectedPost],
+  results: [publishedPost, removedPost],
 }
 
 const emptyPage: PaginatedResponse<AuthorPostListItem> = {
+  count: 0,
+  next: null,
+  previous: null,
+  results: [],
+}
+
+const emptyCommentsPage: PaginatedResponse<AuthorCommentListItem> = {
   count: 0,
   next: null,
   previous: null,
@@ -111,6 +127,7 @@ describe('DashboardPage', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     getAuthorPostsMock.mockResolvedValue(emptyPage)
+    getAuthorCommentsMock.mockResolvedValue(emptyCommentsPage)
   })
 
   it('shows a loading state while author posts are requested', () => {
@@ -118,9 +135,9 @@ describe('DashboardPage', () => {
 
     renderDashboard()
 
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Loading your posts…',
-    )
+    expect(
+      screen.getByText('Loading your posts…'),
+    ).toBeInTheDocument()
     expect(getAuthorPostsMock).toHaveBeenCalledWith({
       page: 1,
     })
@@ -138,7 +155,7 @@ describe('DashboardPage', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('2 posts')).toBeInTheDocument()
     expect(screen.getByText('published')).toBeInTheDocument()
-    expect(screen.getByText('rejected')).toBeInTheDocument()
+    expect(screen.getByText('removed')).toBeInTheDocument()
     expect(
       screen.getByText(
         'Please add sources for the main claim.',
@@ -153,6 +170,53 @@ describe('DashboardPage', () => {
     expect(
       screen.getAllByRole('link', { name: 'View' }),
     ).toHaveLength(1)
+    expect(
+      screen.getAllByRole('link', { name: 'Edit' }),
+    ).toHaveLength(2)
+    expect(
+      screen.getAllByRole('link', { name: 'Edit' })[0],
+    ).toHaveAttribute('href', '/dashboard/posts/12/edit')
+    expect(
+      screen.getByRole('link', { name: 'New post' }),
+    ).toHaveAttribute('href', '/dashboard/posts/new')
+  })
+
+  it('shows an author their comment status and moderation feedback', async () => {
+    getAuthorCommentsMock.mockResolvedValue({
+      count: 1,
+      next: null,
+      previous: null,
+      results: [
+        {
+          id: 40,
+          post_title: 'Campus technology',
+          post_slug: 'campus-technology',
+          post_status: 'published',
+          content: 'A comment that was removed.',
+          status: 'removed',
+          moderation_feedback:
+            'Please keep comments related to the post.',
+          created_at: '2026-07-30T10:00:00Z',
+          updated_at: '2026-07-30T11:00:00Z',
+        },
+      ],
+    })
+
+    renderDashboard()
+
+    expect(
+      await screen.findByRole('link', {
+        name: 'Campus technology',
+      }),
+    ).toHaveAttribute('href', '/posts/campus-technology')
+    expect(
+      screen.getByText('A comment that was removed.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Please keep comments related to the post.',
+      ),
+    ).toBeInTheDocument()
   })
 
   it('renders an empty state for a new author', async () => {
@@ -166,6 +230,11 @@ describe('DashboardPage', () => {
     expect(
       screen.getByText('Your first draft will appear here.'),
     ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', {
+        name: 'Create your first post',
+      }),
+    ).toHaveAttribute('href', '/dashboard/posts/new')
   })
 
   it('shows an API error and retries the request', async () => {
@@ -197,7 +266,7 @@ describe('DashboardPage', () => {
       next: 'http://localhost:8000/api/dashboard/posts/?page=2',
     })
     const secondPagePost: AuthorPostListItem = {
-      ...rejectedPost,
+      ...removedPost,
       id: 30,
       title: 'Second page draft',
       slug: 'second-page-draft',

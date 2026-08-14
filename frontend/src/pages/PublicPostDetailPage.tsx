@@ -2,6 +2,14 @@ import {
     useEffect,
     useState,
 } from 'react'
+import {Icon} from '@iconify/react'
+import arrowLeftIcon from '@iconify-icons/lucide/arrow-left'
+import arrowUpRightIcon from '@iconify-icons/lucide/arrow-up-right'
+import bookOpenIcon from '@iconify-icons/lucide/book-open'
+import clockIcon from '@iconify-icons/lucide/clock-3'
+import calendarIcon from '@iconify-icons/lucide/calendar-days'
+import penLineIcon from '@iconify-icons/lucide/pen-line'
+import tagIcon from '@iconify-icons/lucide/tag'
 import {
     Link,
     useParams,
@@ -15,6 +23,11 @@ import {
 } from '../api/posts'
 import {PostContentBlock} from '../components/PostContentBlock'
 import {PostCommentsSection} from '../components/PostCommentsSection'
+import {SavedPostButton} from '../components/SavedPostButton'
+import {
+    containsSupportedMarkup,
+    sanitizeRichText,
+} from '../richText'
 
 const postDateFormatter = new Intl.DateTimeFormat(
     undefined,
@@ -113,51 +126,42 @@ export function PublicPostDetailPage() {
     }, [post])
 
     return (
-        <section className="container py-5">
+        <section className="app-shell post-detail-page">
             <Link
-                className="d-inline-block mb-4 text-decoration-none"
+                className="post-detail-back"
                 to="/"
             >
-                ← All posts
+                <Icon icon={arrowLeftIcon} aria-hidden="true"/> All posts
             </Link>
 
             {isLoading && (
-                <div
-                    className="text-center py-5"
-                    role="status"
-                >
-                    <div
-                        className="spinner-border text-primary mb-3"
-                        aria-hidden="true"
-                    />
-
-                    <p className="mb-0">
-                        Loading post…
-                    </p>
+                <div className="content-state" role="status">
+                    <span className="loading-ring" aria-hidden="true"/>
+                    <p>Loading post…</p>
                 </div>
             )}
 
             {!isLoading && isNotFound && (
-                <div className="text-center py-5">
+                <div className="empty-state">
                     <h1>Post not found</h1>
 
-                    <p className="text-secondary">
+                    <p>
                         This post may not exist, may not be
                         published, or may have been removed.
                     </p>
 
-                    <Link className="btn btn-primary" to="/">
+                    <Link className="button button--primary" to="/">
                         Browse published posts
                     </Link>
                 </div>
             )}
 
             {!isLoading && loadError && (
-                <div className="alert alert-danger" role="alert">
-                    <p className="mb-3">{loadError}</p>
+                <div className="app-alert app-alert--danger" role="alert">
+                    <p>{loadError}</p>
 
                     <button
-                        className="btn btn-outline-danger"
+                        className="button button--secondary"
                         type="button"
                         onClick={() => {
                             setReloadKey(
@@ -174,122 +178,199 @@ export function PublicPostDetailPage() {
                 !isNotFound &&
                 !loadError &&
                 post && (
-                    <article>
-                        <header className="col-lg-9 col-xl-8 mx-auto text-center mb-5">
-                            <div className="d-flex flex-wrap justify-content-center gap-2 mb-3">
-                                <span className="badge text-bg-primary text-capitalize">
-                                    {post.post_type}
-                                </span>
-
-                                {post.category && (
-                                    <span className="badge text-bg-secondary">
-                                        {post.category.name}
+                    <article className="post-article">
+                        <header className="post-article__hero">
+                            <div className="post-article__hero-copy">
+                                <div className="post-article__labels">
+                                    <span className="content-label">
+                                        {post.post_type}
                                     </span>
+
+                                    {post.category &&
+                                        post.category.name.toLowerCase() !==
+                                            post.post_type.toLowerCase() && (
+                                        <span className="content-label">
+                                            {post.category.name}
+                                        </span>
+                                    )}
+                                </div>
+
+                                <h1>{post.title}</h1>
+
+                                {post.excerpt && (
+                                    <p className="post-article__excerpt">
+                                        {post.excerpt}
+                                    </p>
                                 )}
                             </div>
 
-                            <h1 className="display-5 fw-bold">
-                                {post.title}
-                            </h1>
+                            <aside
+                                className="post-article__sidecar"
+                                aria-label="Post details"
+                            >
+                                <div className="post-article__author">
+                                    <span aria-hidden="true">
+                                        {(post.author_username ?? 'T')
+                                            .charAt(0)
+                                            .toUpperCase()}
+                                    </span>
 
-                            {post.excerpt && (
-                                <p className="lead text-secondary mt-3">
-                                    {post.excerpt}
-                                </p>
-                            )}
-
-                            <div className="d-flex flex-wrap justify-content-center gap-2 text-secondary mt-4">
-                                <span>
-                                    By{' '}
-                                    {post.author_username ??
-                                        'Deleted user'}
-                                </span>
-
-                                <span aria-hidden="true">·</span>
-
-                                <time dateTime={post.published_at}>
-                                    {formatPostDate(
-                                        post.published_at,
-                                    )}
-                                </time>
-
-                                <span aria-hidden="true">·</span>
-
-                                <span>
-                                    {post.reading_time} min read
-                                </span>
-                            </div>
-
-                            {post.tags.length > 0 && (
-                                <div className="d-flex flex-wrap justify-content-center gap-2 mt-4">
-                                    {post.tags.map((tag) => (
-                                        <span
-                                            className="badge rounded-pill text-bg-dark"
-                                            key={tag.id}
-                                        >
-                                            #{tag.name}
-                                        </span>
-                                    ))}
+                                    <div>
+                                        <small>Written by</small>
+                                        {post.author_username ? (
+                                            <Link
+                                                to={`/profile/${post.author_username}`}
+                                            >
+                                                By {post.author_username}
+                                            </Link>
+                                        ) : (
+                                            <strong>By Deleted user</strong>
+                                        )}
+                                    </div>
                                 </div>
-                            )}
+
+                                <div className="post-article__facts">
+                                    <div>
+                                        <Icon icon={calendarIcon} aria-hidden="true"/>
+                                        <span>
+                                            <small>Published</small>
+                                            <time dateTime={post.published_at}>
+                                                {formatPostDate(post.published_at)}
+                                            </time>
+                                        </span>
+                                    </div>
+
+                                    <div>
+                                        <Icon icon={clockIcon} aria-hidden="true"/>
+                                        <span>
+                                            <small>Reading time</small>
+                                            <strong>{post.reading_time} min read</strong>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {post.tags.length > 0 && (
+                                    <div className="post-article__tag-group">
+                                        <span>
+                                            <Icon icon={tagIcon} aria-hidden="true"/>
+                                            Topics
+                                        </span>
+                                        <div className="post-tags post-article__tags">
+                                            {post.tags.map((tag) => (
+                                                <Link
+                                                    key={tag.id}
+                                                    to={`/topics/${tag.slug}`}
+                                                >
+                                                    #{tag.name}
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <SavedPostButton post={{slug: post.slug, title: post.title, excerpt: post.excerpt, author: post.author_username ?? 'Deleted user', category: post.category?.name ?? post.post_type, readingTime: post.reading_time}}/>
+                            </aside>
                         </header>
 
                         {post.featured_image && (
-                            <figure className="col-xl-10 mx-auto mb-5">
+                            <figure className="post-article__featured-image">
                                 <img
-                                    className="img-fluid rounded w-100"
                                     src={post.featured_image}
                                     alt={
                                         post.featured_image_alt
                                     }
-                                    style={{
-                                        maxHeight: '560px',
-                                        objectFit: 'cover',
-                                    }}
                                 />
                             </figure>
                         )}
 
-                        {post.content && (
-                            <div className="col-lg-8 mx-auto mb-4">
-                                <p
-                                    className="lead"
-                                    style={{
-                                        whiteSpace: 'pre-wrap',
-                                    }}
-                                >
-                                    {post.content}
-                                </p>
-                            </div>
-                        )}
+                        <div className="post-article__reading-layout">
+                            <aside
+                                className="post-article__reading-rail"
+                                aria-label="Reading guide"
+                            >
+                                <div>
+                                    <span className="section-eyebrow">
+                                        <Icon icon={bookOpenIcon} aria-hidden="true"/>
+                                        Reading
+                                    </span>
+                                    <strong>
+                                        {post.reading_time}{' '}
+                                        {post.reading_time === 1 ? 'minute' : 'minutes'}
+                                    </strong>
+                                    <p>A thought shared with the university community.</p>
+                                </div>
 
-                        <div className="post-content">
-                            {post.blocks.map((block) => (
-                                <PostContentBlock
-                                    block={block}
-                                    key={block.id}
-                                />
-                            ))}
+                                <a href="#discussion">
+                                    Join the discussion
+                                    <Icon icon={arrowUpRightIcon} aria-hidden="true"/>
+                                </a>
+                            </aside>
+
+                            <div className="post-article__reading-column">
+                                <div className="post-article__body">
+                                    {post.content && (
+                                        containsSupportedMarkup(post.content) ? (
+                                            <div
+                                                className="post-article__legacy-content"
+                                                dangerouslySetInnerHTML={{
+                                                    __html: sanitizeRichText(post.content),
+                                                }}
+                                            />
+                                        ) : (
+                                            <div className="post-article__legacy-content">
+                                                <p className="post-article__plain-content">
+                                                    {post.content}
+                                                </p>
+                                            </div>
+                                        )
+                                    )}
+
+                                    <div className="post-content">
+                                        {post.blocks.map((block) => (
+                                            <PostContentBlock
+                                                block={block}
+                                                key={block.id}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <footer className="post-article__footer">
+                                    <div className="post-article__footer-author">
+                                        <span aria-hidden="true">
+                                            <Icon icon={penLineIcon}/>
+                                        </span>
+                                        <div>
+                                            <strong>
+                                                Shared by {post.author_username ?? 'a former member'}
+                                            </strong>
+                                            <p>
+                                                Last updated{' '}
+                                                <time dateTime={post.updated_at}>
+                                                    {formatPostDate(post.updated_at)}
+                                                </time>
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <Link to="/">
+                                        Explore more posts
+                                        <Icon icon={arrowUpRightIcon} aria-hidden="true"/>
+                                    </Link>
+                                </footer>
+                            </div>
                         </div>
 
-                        <footer className="col-lg-8 mx-auto mt-5 pt-4 border-top">
-                            <p className="small text-secondary">
-                                Last updated{' '}
-                                <time dateTime={post.updated_at}>
-                                    {formatPostDate(
-                                        post.updated_at,
-                                    )}
-                                </time>
-                            </p>
-                        </footer>
-
-                        <PostCommentsSection
-                            key={post.slug}
-                            slug={post.slug}
-                            allowComments={
-                                post.allow_comments
-                            }
-                        />
+                        <div
+                            className="post-article__discussion"
+                            id="discussion"
+                        >
+                            <PostCommentsSection
+                                key={post.slug}
+                                slug={post.slug}
+                                allowComments={post.allow_comments}
+                            />
+                        </div>
                     </article>
                 )}
         </section>

@@ -6,7 +6,15 @@ from django.utils import timezone
 from unfold.admin import ModelAdmin, StackedInline
 from unfold.contrib.forms.widgets import WysiwygWidget
 
-from .models import Category, Comment, Post, PostBlock, Tag
+from .models import (
+    Category,
+    Comment,
+    Notification,
+    Post,
+    PostBlock,
+    SavedPost,
+    Tag,
+)
 
 
 def _sync_post_comment_counts(post_ids):
@@ -296,3 +304,28 @@ class TagAdmin(ModelAdmin):
     list_display = ('name', 'slug')
     search_fields = ('name',)
     prepopulated_fields = {'slug': ('name',)}
+
+
+@admin.register(SavedPost)
+class SavedPostAdmin(ModelAdmin):
+    list_display = ('user', 'post', 'saved_at')
+    list_select_related = ('user', 'post')
+    search_fields = ('user__username', 'post__title')
+    readonly_fields = ('saved_at',)
+    ordering = ('-saved_at',)
+
+
+@admin.register(Notification)
+class NotificationAdmin(ModelAdmin):
+    list_display = (
+        'title',
+        'recipient',
+        'kind',
+        'is_read',
+        'created_at',
+    )
+    list_filter = ('kind', 'is_read', 'created_at')
+    list_select_related = ('recipient', 'actor', 'post', 'comment')
+    search_fields = ('title', 'message', 'recipient__username')
+    readonly_fields = ('created_at',)
+    ordering = ('-created_at',)

@@ -440,3 +440,86 @@ class Comment(models.Model):
                 name='blog_comment_post_status_idx',
             ),
         ]
+
+
+class SavedPost(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='saved_posts',
+    )
+    post = models.ForeignKey(
+        Post,
+        on_delete=models.CASCADE,
+        related_name='saved_by',
+    )
+    saved_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.user.username} saved {self.post.title}'
+
+    class Meta:
+        ordering = ('-saved_at', '-pk')
+        constraints = [
+            models.UniqueConstraint(
+                fields=('user', 'post'),
+                name='blog_unique_saved_post',
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=('user', 'saved_at'),
+                name='blog_saved_user_time_idx',
+            ),
+        ]
+
+
+class Notification(models.Model):
+    class Kind(models.TextChoices):
+        NEW_COMMENT = 'new_comment', 'New comment'
+        POST_REMOVED = 'post_removed', 'Post removed'
+        COMMENT_REMOVED = 'comment_removed', 'Comment removed'
+
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='notifications',
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='notification_actions',
+        null=True,
+        blank=True,
+    )
+    post = models.ForeignKey(
+        Post,
+        on_delete=models.SET_NULL,
+        related_name='notifications',
+        null=True,
+        blank=True,
+    )
+    comment = models.ForeignKey(
+        Comment,
+        on_delete=models.SET_NULL,
+        related_name='notifications',
+        null=True,
+        blank=True,
+    )
+    kind = models.CharField(max_length=30, choices=Kind.choices)
+    title = models.CharField(max_length=200)
+    message = models.CharField(max_length=500)
+    is_read = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.recipient.username}: {self.title}'
+
+    class Meta:
+        ordering = ('-created_at', '-pk')
+        indexes = [
+            models.Index(
+                fields=('recipient', 'is_read', 'created_at'),
+                name='blog_notice_user_read_idx',
+            ),
+        ]

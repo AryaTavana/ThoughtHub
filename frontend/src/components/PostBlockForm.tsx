@@ -228,13 +228,13 @@ export function PostBlockForm({
 
     return (
         <form
-            className="border rounded p-3 bg-body-tertiary"
+            className="block-editor-form"
             onSubmit={handleSubmit}
             aria-label={block ? 'Edit content block' : 'Add content block'}
             aria-busy={isSubmitting}
         >
             {submitError && (
-                <div className="alert alert-danger" role="alert">
+                <div className="app-alert app-alert--danger" role="alert">
                     {submitError}
                 </div>
             )}
@@ -562,16 +562,16 @@ export function PostBlockForm({
                 </p>
             )}
 
-            <div className="d-flex gap-2">
+            <div className="block-editor-form__actions">
                 <button
-                    className="btn btn-primary"
+                    className="button button--primary button--small"
                     type="submit"
                     disabled={isSubmitting}
                 >
                     {isSubmitting ? 'Saving block…' : 'Save block'}
                 </button>
                 <button
-                    className="btn btn-outline-secondary"
+                    className="button button--secondary button--small"
                     type="button"
                     onClick={onCancel}
                     disabled={isSubmitting}

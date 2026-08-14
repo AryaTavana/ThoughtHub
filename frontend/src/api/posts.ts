@@ -139,6 +139,7 @@ export interface PublicPostDetail
 
 export interface PublishedPostListParameters {
     page?: number
+    search?: string
 }
 
 export function getPublishedPosts(
@@ -148,6 +149,10 @@ export function getPublishedPosts(
 
     if (parameters.page !== undefined) {
         searchParameters.set('page', String(parameters.page))
+    }
+
+    if (parameters.search?.trim()) {
+        searchParameters.set('search', parameters.search.trim())
     }
 
     const queryString = searchParameters.toString()

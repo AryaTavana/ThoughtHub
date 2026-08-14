@@ -13,10 +13,11 @@ export function ProtectedRoute() {
     if (isInitializing) {
         return (
             <section
-                className="container py-5 text-center"
+                className="app-shell system-loading-state"
                 role="status"
             >
-                Checking your session…
+                <span className="loading-ring" aria-hidden="true"/>
+                <p>Checking your session…</p>
             </section>
         )
     }

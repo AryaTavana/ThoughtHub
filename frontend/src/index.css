@@ -190,8 +190,8 @@
 }
 
 :root {
-  --sans: 'Open Sans', system-ui, sans-serif;
-  --heading: 'Open Sans', system-ui, sans-serif;
+  --sans: 'Roboto', system-ui, sans-serif;
+  --heading: 'Roboto', system-ui, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
   --bs-body-font-family: var(--sans);
@@ -221,11 +221,17 @@ body {
   min-height: 100%;
 }
 
+html {
+  font-size: 17px;
+}
+
 body {
   margin: 0;
   min-width: 320px;
   color: var(--text-body);
   font-family: var(--sans);
+  font-size: 1rem;
+  line-height: 1.6;
   background: var(--background-body);
 }
 

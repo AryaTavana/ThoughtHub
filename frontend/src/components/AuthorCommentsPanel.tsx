@@ -1,3 +1,8 @@
+import {Icon} from '@iconify/react'
+import arrowLeftIcon from '@iconify-icons/lucide/arrow-left'
+import arrowRightIcon from '@iconify-icons/lucide/arrow-right'
+import messageIcon from '@iconify-icons/lucide/message-circle'
+import shieldIcon from '@iconify-icons/lucide/shield-check'
 import {
     useEffect,
     useState,
@@ -73,28 +78,37 @@ export function AuthorCommentsPanel() {
 
     return (
         <section
-            className="mt-5 pt-5 border-top"
+            className="author-comments-panel"
             aria-labelledby="author-comments-heading"
         >
-            <header className="mb-4">
-                <h2 id="author-comments-heading">
-                    Your comments
-                </h2>
-                <p className="text-secondary mb-0">
-                    Track your published comments and any moderation
-                    feedback.
-                </p>
+            <header className="author-comments-panel__header">
+                <div className="author-comments-panel__icon" aria-hidden="true">
+                    <Icon icon={messageIcon}/>
+                </div>
+                <div>
+                    <p className="section-eyebrow">Your conversations</p>
+                    <h2 id="author-comments-heading">Your comments</h2>
+                    <p>Track published comments and any feedback from moderators.</p>
+                </div>
+                {commentsPage && (
+                    <span className="post-count">
+                        {commentsPage.count} {commentsPage.count === 1 ? 'comment' : 'comments'}
+                    </span>
+                )}
             </header>
 
             {isLoading && (
-                <p role="status">Loading your comments…</p>
+                <div className="content-state content-state--compact" role="status">
+                    <span className="loading-ring" aria-hidden="true"/>
+                    <p>Loading your comments…</p>
+                </div>
             )}
 
             {!isLoading && loadError && (
-                <div className="alert alert-danger" role="alert">
+                <div className="app-alert app-alert--danger" role="alert">
                     <p>{loadError}</p>
                     <button
-                        className="btn btn-outline-danger btn-sm"
+                        className="button button--secondary button--small"
                         type="button"
                         onClick={() => {
                             setReloadKey((current) => current + 1)
@@ -108,9 +122,14 @@ export function AuthorCommentsPanel() {
             {!isLoading &&
                 !loadError &&
                 commentsPage?.results.length === 0 && (
-                    <p className="text-secondary mb-0">
-                        You have not published any comments yet.
-                    </p>
+                    <div className="author-comments-empty">
+                        <Icon icon={messageIcon} aria-hidden="true"/>
+                        <div>
+                            <h3>No comments yet</h3>
+                            <p>Your conversations will be collected here after you join a post discussion.</p>
+                        </div>
+                        <Link className="button button--secondary button--small" to="/">Explore posts</Link>
+                    </div>
                 )}
 
             {!isLoading &&
@@ -118,14 +137,19 @@ export function AuthorCommentsPanel() {
                 commentsPage &&
                 commentsPage.results.length > 0 && (
                     <>
-                        <div className="list-group">
+                        <div className="author-comment-list">
                             {commentsPage.results.map((comment) => (
                                 <article
-                                    className="list-group-item py-4"
+                                    className="author-comment-card"
                                     key={comment.id}
                                 >
-                                    <div className="d-flex flex-wrap justify-content-between gap-2">
-                                        <h3 className="h6 mb-0">
+                                    <div className="author-comment-card__topline">
+                                        <div className="author-comment-card__mark" aria-hidden="true">
+                                            <Icon icon={messageIcon}/>
+                                        </div>
+                                        <div>
+                                            <span>Comment on</span>
+                                            <h3>
                                             {comment.post_status ===
                                             'published' ? (
                                                 <Link
@@ -137,33 +161,25 @@ export function AuthorCommentsPanel() {
                                                 comment.post_title
                                             )}
                                         </h3>
-                                        <span className="badge text-bg-secondary text-capitalize">
+                                        </div>
+                                        <span className={`status-badge status-badge--${comment.status}`}>
                                             {comment.status}
                                         </span>
                                     </div>
 
                                     <p
-                                        className="my-3"
+                                        className="author-comment-card__content"
                                         style={{whiteSpace: 'pre-wrap'}}
                                     >
                                         {comment.content}
                                     </p>
 
-                                    <p className="small text-secondary mb-0">
-                                        Published{' '}
-                                        {formatCommentDate(
-                                            comment.created_at,
-                                        )}
-                                    </p>
+                                    <time dateTime={comment.created_at}>Published {formatCommentDate(comment.created_at)}</time>
 
                                     {comment.moderation_feedback && (
-                                        <div className="alert alert-warning mt-3 mb-0">
-                                            <strong>
-                                                Moderation feedback:
-                                            </strong>{' '}
-                                            {
-                                                comment.moderation_feedback
-                                            }
+                                        <div className="moderation-inline-feedback">
+                                            <Icon icon={shieldIcon} aria-hidden="true"/>
+                                            <div><strong>Moderation feedback</strong><p>{comment.moderation_feedback}</p></div>
                                         </div>
                                     )}
                                 </article>
@@ -173,11 +189,11 @@ export function AuthorCommentsPanel() {
                         {(commentsPage.previous ||
                             commentsPage.next) && (
                             <nav
-                                className="d-flex justify-content-center align-items-center gap-3 mt-4"
+                                className="pagination-bar"
                                 aria-label="Dashboard comment pages"
                             >
                                 <button
-                                    className="btn btn-outline-primary"
+                                    className="button button--secondary"
                                     type="button"
                                     disabled={
                                         commentsPage.previous === null
@@ -191,13 +207,13 @@ export function AuthorCommentsPanel() {
                                         )
                                     }}
                                 >
-                                    Previous comments
+                                    <Icon icon={arrowLeftIcon} aria-hidden="true"/> Previous comments
                                 </button>
                                 <span aria-live="polite">
                                     Comment page {page}
                                 </span>
                                 <button
-                                    className="btn btn-outline-primary"
+                                    className="button button--secondary"
                                     type="button"
                                     disabled={commentsPage.next === null}
                                     onClick={() => {
@@ -207,7 +223,7 @@ export function AuthorCommentsPanel() {
                                         )
                                     }}
                                 >
-                                    Next comments
+                                    Next comments <Icon icon={arrowRightIcon} aria-hidden="true"/>
                                 </button>
                             </nav>
                         )}

@@ -156,6 +156,11 @@ describe('PublicPostsPage', () => {
     expect(screen.getByText('#React')).toBeInTheDocument()
     expect(screen.getByText('By arya')).toBeInTheDocument()
     expect(screen.getByText(/6 min read/)).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', {
+        name: 'Save Learning Django and React',
+      }),
+    ).toHaveTextContent('Save')
   })
 
   it('renders an empty state when no posts are published', async () => {

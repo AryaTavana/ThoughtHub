@@ -9,9 +9,15 @@ from .views import (
     AuthorPostListView,
     AuthorPostPublishView,
     CategoryListView,
+    NotificationDetailView,
+    NotificationListView,
+    NotificationMarkAllReadView,
+    NotificationUnreadCountView,
     PublicPostCommentListCreateView,
     PublicPostDetailView,
     PublicPostListView,
+    SavedPostDetailView,
+    SavedPostListCreateView,
     TagListView,
 )
 
@@ -38,6 +44,36 @@ urlpatterns = [
         'tags/',
         TagListView.as_view(),
         name='tag-list',
+    ),
+    path(
+        'saved-posts/',
+        SavedPostListCreateView.as_view(),
+        name='saved-post-list',
+    ),
+    path(
+        'saved-posts/<str:slug>/',
+        SavedPostDetailView.as_view(),
+        name='saved-post-detail',
+    ),
+    path(
+        'notifications/',
+        NotificationListView.as_view(),
+        name='notification-list',
+    ),
+    path(
+        'notifications/unread-count/',
+        NotificationUnreadCountView.as_view(),
+        name='notification-unread-count',
+    ),
+    path(
+        'notifications/mark-all-read/',
+        NotificationMarkAllReadView.as_view(),
+        name='notification-mark-all-read',
+    ),
+    path(
+        'notifications/<int:pk>/',
+        NotificationDetailView.as_view(),
+        name='notification-detail',
     ),
     path('dashboard/posts/', AuthorPostListView.as_view(), name='author-post-list'),
     path(

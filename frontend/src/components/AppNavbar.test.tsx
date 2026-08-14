@@ -2,6 +2,7 @@ import {
   act,
   render,
   screen,
+  waitFor,
   within,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -50,7 +51,7 @@ function CurrentPath() {
 
   return (
     <output data-testid="current-path">
-      {location.pathname}
+      {location.pathname}{location.search}
     </output>
   )
 }
@@ -108,6 +109,24 @@ describe('AppNavbar', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('opens live search automatically while the user types', async () => {
+    const user = userEvent.setup()
+    renderNavbar()
+
+    await user.type(
+      screen.getByRole('searchbox', {
+        name: 'Search posts, people, and topics',
+      }),
+      'Django',
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('current-path')).toHaveTextContent(
+        '/search?q=Django',
+      )
+    })
+  })
+
   it('shows a neutral status while authentication initializes', () => {
     renderNavbar('/', {
       isInitializing: true,
@@ -140,6 +159,12 @@ describe('AppNavbar', () => {
     expect(
       screen.getByRole('link', { name: 'Dashboard' }),
     ).toHaveClass('active')
+    expect(
+      screen.getByRole('link', { name: 'Saved posts' }),
+    ).toHaveAttribute('href', '/saved')
+    expect(
+      screen.getByRole('link', { name: 'Notifications' }),
+    ).toHaveAttribute('href', '/notifications')
     expect(screen.getByText('Arya')).toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: 'Log out' }),

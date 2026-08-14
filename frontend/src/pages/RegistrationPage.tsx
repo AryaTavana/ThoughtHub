@@ -39,7 +39,7 @@ function FieldError({id, messages}: FieldErrorProps) {
     }
 
     return (
-        <div id={id} className="invalid-feedback d-block">
+        <div id={id} className="field-error">
             {messages.join(' ')}
         </div>
     )
@@ -123,7 +123,7 @@ export function RegistrationPage() {
 
     if (isInitializing) {
         return (
-            <main className="container py-5">
+            <main className="content-state app-shell">
                 <p role="status">Checking your account...</p>
             </main>
         )
@@ -134,21 +134,33 @@ export function RegistrationPage() {
     }
 
     return (
-        <main className="container py-5">
-            <div className="row justify-content-center">
-                <div className="col-12 col-md-8 col-lg-6">
-                    <div className="card shadow-sm">
-                        <div className="card-body p-4">
+        <main className="auth-page auth-page--registration app-shell">
+            <aside className="auth-welcome">
+                <div>
+                    <p className="section-eyebrow">Join ThoughtHub</p>
+                    <p className="auth-welcome__heading">Make space for your ideas.</p>
+                    <p>Create your student profile and start sharing technology, university experiences, and the thoughts worth discussing.</p>
+                </div>
+                <ol className="registration-promises">
+                    <li><span>01</span><div><strong>Publish without waiting</strong><p>Your posts and comments appear immediately.</p></div></li>
+                    <li><span>02</span><div><strong>Write without pressure</strong><p>Save drafts and shape ideas at your pace.</p></div></li>
+                    <li><span>03</span><div><strong>Find your community</strong><p>Connect through shared subjects and experiences.</p></div></li>
+                </ol>
+            </aside>
+            <div className="auth-card-container">
+                <div className="auth-card-registration">
+                    <div className="auth-card">
+                        <div className="auth-card__body">
+                            <p className="section-eyebrow auth-card__eyebrow">Join ThoughtHub</p>
                             <h1 className="h3 mb-3">Create account</h1>
 
-                            <p className="text-secondary">
-                                Create an account to write and manage your
-                                posts.
+                            <p className="text-secondary auth-card__intro">
+                                It only takes a minute to start sharing.
                             </p>
 
                             {initializationError && (
                                 <div
-                                    className="alert alert-warning"
+                                    className="app-alert app-alert--warning"
                                     role="alert"
                                 >
                                     {initializationError}
@@ -157,7 +169,7 @@ export function RegistrationPage() {
 
                             {submitError && (
                                 <div
-                                    className="alert alert-danger"
+                                    className="app-alert app-alert--danger"
                                     role="alert"
                                 >
                                     {submitError}
@@ -165,10 +177,11 @@ export function RegistrationPage() {
                             )}
 
                             <form
+                                className="registration-form"
                                 onSubmit={handleSubmit}
                                 aria-busy={isSubmitting}
                             >
-                                <div className="mb-3">
+                                <div className="registration-field">
                                     <label
                                         className="form-label"
                                         htmlFor="register-username"
@@ -197,6 +210,7 @@ export function RegistrationPage() {
                                                 : undefined
                                         }
                                         disabled={isSubmitting}
+                                        placeholder="Choose a username"
                                         required
                                     />
 
@@ -206,7 +220,7 @@ export function RegistrationPage() {
                                     />
                                 </div>
 
-                                <div className="mb-3">
+                                <div className="registration-field">
                                     <label
                                         className="form-label"
                                         htmlFor="register-email"
@@ -235,6 +249,7 @@ export function RegistrationPage() {
                                                 : undefined
                                         }
                                         disabled={isSubmitting}
+                                        placeholder="you@university.edu"
                                         required
                                     />
 
@@ -244,8 +259,8 @@ export function RegistrationPage() {
                                     />
                                 </div>
 
-                                <div className="row">
-                                    <div className="col-md-6 mb-3">
+                                <div className="registration-name-grid">
+                                    <div className="registration-field">
                                         <label
                                             className="form-label"
                                             htmlFor="register-first-name"
@@ -274,6 +289,7 @@ export function RegistrationPage() {
                                                     : undefined
                                             }
                                             disabled={isSubmitting}
+                                            placeholder="First name"
                                         />
 
                                         <FieldError
@@ -284,7 +300,7 @@ export function RegistrationPage() {
                                         />
                                     </div>
 
-                                    <div className="col-md-6 mb-3">
+                                    <div className="registration-field">
                                         <label
                                             className="form-label"
                                             htmlFor="register-last-name"
@@ -313,6 +329,7 @@ export function RegistrationPage() {
                                                     : undefined
                                             }
                                             disabled={isSubmitting}
+                                            placeholder="Last name"
                                         />
 
                                         <FieldError
@@ -322,7 +339,7 @@ export function RegistrationPage() {
                                     </div>
                                 </div>
 
-                                <div className="mb-3">
+                                <div className="registration-field">
                                     <label
                                         className="form-label"
                                         htmlFor="register-password"
@@ -351,6 +368,7 @@ export function RegistrationPage() {
                                                 : undefined
                                         }
                                         disabled={isSubmitting}
+                                        placeholder="Create a secure password"
                                         required
                                     />
 
@@ -360,7 +378,7 @@ export function RegistrationPage() {
                                     />
                                 </div>
 
-                                <div className="mb-3">
+                                <div className="registration-field">
                                     <label
                                         className="form-label"
                                         htmlFor="register-password-confirm"
@@ -389,6 +407,7 @@ export function RegistrationPage() {
                                                 : undefined
                                         }
                                         disabled={isSubmitting}
+                                        placeholder="Repeat your password"
                                         required
                                     />
 
@@ -401,7 +420,7 @@ export function RegistrationPage() {
                                 </div>
 
                                 <button
-                                    className="btn btn-primary w-100"
+                                    className="button button--primary button--block"
                                     type="submit"
                                     disabled={isSubmitting}
                                 >
@@ -411,7 +430,7 @@ export function RegistrationPage() {
                                 </button>
                             </form>
 
-                            <p className="text-center mt-3 mb-0">
+                            <p className="text-center mt-3 mb-0 auth-register-link">
                                 Already have an account?{' '}
                                 <Link to="/login">Sign in</Link>
                             </p>

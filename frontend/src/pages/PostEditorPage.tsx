@@ -1,3 +1,11 @@
+import {Icon} from '@iconify/react'
+import arrowLeftIcon from '@iconify-icons/lucide/arrow-left'
+import fileTextIcon from '@iconify-icons/lucide/file-text'
+import imageIcon from '@iconify-icons/lucide/image'
+import layersIcon from '@iconify-icons/lucide/layers-3'
+import searchIcon from '@iconify-icons/lucide/search'
+import sendIcon from '@iconify-icons/lucide/send'
+import trashIcon from '@iconify-icons/lucide/trash-2'
 import {
     useEffect,
     useState,
@@ -331,21 +339,21 @@ export function PostEditorPage() {
 
     if (isLoading) {
         return (
-            <section className="container py-5">
-                <p role="status">Loading post editor…</p>
+            <section className="app-shell editor-page">
+                <div className="content-state" role="status"><span className="loading-ring" aria-hidden="true"/><p>Loading post editor…</p></div>
             </section>
         )
     }
 
     if (loadError) {
         return (
-            <section className="container py-5">
-                <div className="alert alert-danger" role="alert">
+            <section className="app-shell editor-page">
+                <div className="app-alert app-alert--danger" role="alert">
                     <p>{loadError}</p>
 
                     {hasValidPostId && (
                         <button
-                            className="btn btn-outline-danger me-2"
+                            className="button button--secondary"
                             type="button"
                             onClick={() => {
                                 setReloadKey((current) => current + 1)
@@ -356,7 +364,7 @@ export function PostEditorPage() {
                     )}
 
                     <Link
-                        className="btn btn-outline-secondary"
+                        className="button button--secondary"
                         to="/dashboard"
                     >
                         Back to dashboard
@@ -372,15 +380,16 @@ export function PostEditorPage() {
     const formIsDisabled = isSubmitting || isDeleting
 
     return (
-        <section className="container py-5">
-            <div className="row justify-content-center">
-                <div className="col-12 col-xl-9">
-                    <header className="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <section className="app-shell editor-page">
+            <div className="editor-workspace">
+                    <header className="editor-header">
                         <div>
-                            <h1 className="mb-2">
+                            <Link className="editor-header__back" to="/dashboard"><Icon icon={arrowLeftIcon} aria-hidden="true"/> Dashboard</Link>
+                            <p className="section-eyebrow">Writer workspace</p>
+                            <h1>
                                 {isEditing ? 'Edit post' : 'New post'}
                             </h1>
-                            <p className="text-secondary mb-0">
+                            <p>
                                 {isEditing
                                     ? 'Update your writing or publish it immediately.'
                                     : 'Save a draft or publish when you are ready.'}
@@ -388,21 +397,21 @@ export function PostEditorPage() {
                         </div>
 
                         {post && (
-                            <span className="badge text-bg-secondary text-capitalize fs-6">
+                            <span className={`status-badge status-badge--${post.status}`}>
                                 {post.status.replace('_', ' ')}
                             </span>
                         )}
                     </header>
 
                     {post?.review_feedback && (
-                        <div className="alert alert-warning" role="status">
+                        <div className="app-alert app-alert--warning" role="status">
                             <strong>Moderation feedback:</strong>{' '}
                             {post.review_feedback}
                         </div>
                     )}
 
                     {submitError && (
-                        <div className="alert alert-danger" role="alert">
+                        <div className="app-alert app-alert--danger" role="alert">
                             {submitError}
                         </div>
                     )}
@@ -411,9 +420,9 @@ export function PostEditorPage() {
                         onSubmit={handleSubmit}
                         aria-busy={formIsDisabled}
                     >
-                        <div className="card shadow-sm mb-4">
-                            <div className="card-body p-4">
-                                <h2 className="h4 mb-4">Post details</h2>
+                        <div className="card editor-panel editor-panel--details">
+                            <div className="card-body">
+                                <div className="editor-panel__heading"><span><Icon icon={fileTextIcon} aria-hidden="true"/></span><div><p className="section-eyebrow">Core story</p><h2>Post details</h2><p>Give readers a clear reason to open and continue reading.</p></div></div>
 
                                 <div className="mb-3">
                                     <label
@@ -691,9 +700,9 @@ export function PostEditorPage() {
                             </div>
                         </div>
 
-                        <div className="card shadow-sm mb-4">
-                            <div className="card-body p-4">
-                                <h2 className="h4 mb-4">Search preview</h2>
+                        <div className="card editor-panel editor-panel--search">
+                            <div className="card-body">
+                                <div className="editor-panel__heading"><span><Icon icon={searchIcon} aria-hidden="true"/></span><div><p className="section-eyebrow">Discoverability</p><h2>Search preview</h2><p>Optional text for search engines and link previews.</p></div></div>
 
                                 <div className="mb-3">
                                     <label
@@ -775,11 +784,9 @@ export function PostEditorPage() {
                         </div>
 
                         {post?.featured_image && (
-                            <div className="card shadow-sm mb-4">
-                                <div className="card-body p-4">
-                                    <h2 className="h4 mb-3">
-                                        Featured image
-                                    </h2>
+                            <div className="card editor-panel editor-panel--image">
+                                <div className="card-body">
+                                    <div className="editor-panel__heading"><span><Icon icon={imageIcon} aria-hidden="true"/></span><div><p className="section-eyebrow">Visual context</p><h2>Featured image</h2><p>Describe the image so every reader receives its meaning.</p></div></div>
                                     <img
                                         className="img-fluid rounded mb-3"
                                         src={post.featured_image}
@@ -823,9 +830,10 @@ export function PostEditorPage() {
                             </div>
                         )}
 
-                        <div className="d-flex flex-wrap align-items-center gap-2">
+                        <div className="editor-actions">
+                            <div><strong>{isEditing ? 'Save this revision' : 'Ready to begin?'}</strong><span>You can return and edit your work at any time.</span></div>
                             <button
-                                className="btn btn-primary"
+                                className="button button--secondary"
                                 type="submit"
                                 value="save"
                                 disabled={formIsDisabled}
@@ -839,7 +847,7 @@ export function PostEditorPage() {
 
                             {canPublish && (
                                 <button
-                                    className="btn btn-success"
+                                    className="button button--primary"
                                     type="submit"
                                     value="publish"
                                     disabled={formIsDisabled}
@@ -849,11 +857,12 @@ export function PostEditorPage() {
                                         : isEditing
                                             ? 'Save and publish'
                                             : 'Create and publish'}
+                                    {!isSubmitting && <Icon icon={sendIcon} aria-hidden="true"/>}
                                 </button>
                             )}
 
                             <Link
-                                className="btn btn-outline-secondary"
+                                className="quiet-link"
                                 to="/dashboard"
                             >
                                 Cancel
@@ -861,37 +870,32 @@ export function PostEditorPage() {
 
                             {post && (
                                 <button
-                                    className="btn btn-outline-danger ms-md-auto"
+                                    className="button button--danger button--small"
                                     type="button"
                                     onClick={() => {
                                         void handleDelete()
                                     }}
                                     disabled={formIsDisabled}
                                 >
-                                    {isDeleting ? 'Deleting…' : 'Delete post'}
+                                    <Icon icon={trashIcon} aria-hidden="true"/>{isDeleting ? 'Deleting…' : 'Delete post'}
                                 </button>
                             )}
                         </div>
                     </form>
 
                     {post ? (
-                        <div className="mt-4">
+                        <div className="editor-blocks-area">
                             <PostBlocksEditor
                                 postId={post.id}
                                 onPostEdited={handleContentEdited}
                             />
                         </div>
                     ) : (
-                        <div className="card shadow-sm mt-4">
-                            <div className="card-body p-4">
-                                <h2 className="h4">Content blocks</h2>
-                                <p className="text-secondary mb-0">
-                                    Create the draft first, then reopen it to add ordered content blocks.
-                                </p>
+                        <div className="editor-blocks-locked">
+                            <div aria-hidden="true"><Icon icon={layersIcon}/></div>
+                            <div><p className="section-eyebrow">Next step</p><h2>Build with content blocks</h2><p>Create the draft first, then reopen it to arrange text, images, videos, quotes, and dividers.</p></div>
                             </div>
-                        </div>
                     )}
-                </div>
             </div>
         </section>
     )

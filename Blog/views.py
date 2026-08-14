@@ -1,6 +1,6 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.generics import (
@@ -9,6 +9,7 @@ from rest_framework.generics import (
     RetrieveAPIView,
     RetrieveUpdateDestroyAPIView,
 )
+from rest_framework import status
 from rest_framework.exceptions import (
     PermissionDenied,
     ValidationError as APIValidationError,
@@ -17,7 +18,15 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Category, Comment, Post, PostBlock, Tag
+from .models import (
+    Category,
+    Comment,
+    Notification,
+    Post,
+    PostBlock,
+    SavedPost,
+    Tag,
+)
 from .serializers import (
     AuthorCommentSerializer,
     AuthorPostBlockSerializer,
@@ -28,6 +37,8 @@ from .serializers import (
     PublicCommentSerializer,
     PublicPostDetailSerializer,
     PublicPostListSerializer,
+    NotificationSerializer,
+    SavedPostSerializer,
     TagSerializer,
 )
 
@@ -43,11 +54,25 @@ class PublicPostListView(ListAPIView):
     permission_classes = (AllowAny,)
 
     def get_queryset(self):
-        return (
+        queryset = (
             Post.objects.published()
             .select_related("author", "category")
             .prefetch_related("tags", "blocks")
         )
+
+        search = self.request.query_params.get('search', '').strip()
+        if search:
+            queryset = queryset.filter(
+                Q(title__icontains=search)
+                | Q(excerpt__icontains=search)
+                | Q(content__icontains=search)
+                | Q(author__username__icontains=search)
+                | Q(category__name__icontains=search)
+                | Q(tags__name__icontains=search)
+                | Q(blocks__content__icontains=search)
+            ).distinct()
+
+        return queryset
 
 
 class PublicPostCommentListCreateView(ListCreateAPIView):
@@ -127,6 +152,123 @@ class TagListView(ListAPIView):
     serializer_class = TagSerializer
     permission_classes = (AllowAny,)
     pagination_class = None
+
+
+class SavedPostListCreateView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        saved_posts = (
+            SavedPost.objects.filter(
+                user=request.user,
+                post__in=Post.objects.published(),
+            )
+            .select_related('post__author', 'post__category')
+            .prefetch_related('post__tags', 'post__blocks')
+        )
+        serializer = SavedPostSerializer(
+            saved_posts,
+            many=True,
+            context={'request': request},
+        )
+        return Response(serializer.data)
+
+    def post(self, request):
+        post_slug = request.data.get('post_slug')
+        if not isinstance(post_slug, str) or not post_slug.strip():
+            raise APIValidationError({
+                'post_slug': 'Choose a published post to save.',
+            })
+
+        post = get_object_or_404(
+            Post.objects.published()
+            .select_related('author', 'category')
+            .prefetch_related('tags', 'blocks'),
+            slug=post_slug.strip(),
+        )
+        saved_post, created = SavedPost.objects.get_or_create(
+            user=request.user,
+            post=post,
+        )
+        serializer = SavedPostSerializer(
+            saved_post,
+            context={'request': request},
+        )
+        return Response(
+            serializer.data,
+            status=(
+                status.HTTP_201_CREATED
+                if created
+                else status.HTTP_200_OK
+            ),
+        )
+
+
+class SavedPostDetailView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def delete(self, request, slug):
+        saved_post = get_object_or_404(
+            SavedPost,
+            user=request.user,
+            post__slug=slug,
+        )
+        saved_post.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class NotificationListView(ListAPIView):
+    serializer_class = NotificationSerializer
+    permission_classes = (IsAuthenticated,)
+    pagination_class = None
+
+    def get_queryset(self):
+        return (
+            Notification.objects.filter(recipient=self.request.user)
+            .select_related('actor', 'post', 'comment')
+        )
+
+
+class NotificationDetailView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def patch(self, request, pk):
+        notification = get_object_or_404(
+            Notification,
+            pk=pk,
+            recipient=request.user,
+        )
+        serializer = NotificationSerializer(
+            notification,
+            data=request.data,
+            partial=True,
+            context={'request': request},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+
+class NotificationMarkAllReadView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        updated = Notification.objects.filter(
+            recipient=request.user,
+            is_read=False,
+        ).update(is_read=True)
+        return Response({'updated': updated})
+
+
+class NotificationUnreadCountView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        count = Notification.objects.filter(
+            recipient=request.user,
+            is_read=False,
+        ).count()
+        return Response({'count': count})
 
 
 class AuthorCommentListView(ListAPIView):

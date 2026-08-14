@@ -231,6 +231,25 @@ describe('PublicPostDetailPage', () => {
     expect(container.querySelector('script')).toBeNull()
   })
 
+  it('renders supported introduction markup and sanitizes unsafe tags', async () => {
+    getPublishedPostMock.mockResolvedValue({
+      ...publishedPost,
+      content:
+        '<p>A <strong>formatted</strong> introduction.</p><script>alert("unsafe")</script>',
+      blocks: [],
+    })
+    const { container } = renderDetailPage()
+
+    expect(
+      await screen.findByText('formatted'),
+    ).toHaveProperty('tagName', 'STRONG')
+    expect(
+      screen.getByText('formatted').closest('p'),
+    ).toHaveTextContent('A formatted introduction.')
+    expect(container.querySelector('script')).toBeNull()
+    expect(container).not.toHaveTextContent('<p>')
+  })
+
   it('shows a dedicated not-found state for a 404 response', async () => {
     getPublishedPostMock.mockRejectedValue(
       new ApiError(

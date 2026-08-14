@@ -1,9 +1,12 @@
-import DOMPurify from 'dompurify'
+import {Icon} from '@iconify/react'
+import externalLinkIcon from '@iconify-icons/lucide/external-link'
+import playIcon from '@iconify-icons/lucide/play'
 
 import type {
     ImageWidth,
     PublicPostBlock,
 } from '../api/posts'
+import {sanitizeRichText} from '../richText'
 
 interface PostContentBlockProps {
     block: PublicPostBlock
@@ -13,40 +16,6 @@ const imageWidthClasses: Record<ImageWidth, string> = {
     content: 'col-lg-8 mx-lg-auto',
     wide: 'col-lg-10 mx-lg-auto',
     full: 'w-100',
-}
-
-const allowedRichTextTags = [
-    'p',
-    'br',
-    'strong',
-    'em',
-    'b',
-    'i',
-    'u',
-    's',
-    'h2',
-    'h3',
-    'h4',
-    'ul',
-    'ol',
-    'li',
-    'blockquote',
-    'a',
-    'code',
-    'pre',
-]
-
-const allowedRichTextAttributes = [
-    'href',
-    'title',
-]
-
-function sanitizeRichText(content: string): string {
-    return DOMPurify.sanitize(content, {
-        ALLOWED_TAGS: allowedRichTextTags,
-        ALLOWED_ATTR: allowedRichTextAttributes,
-        ALLOW_DATA_ATTR: false,
-    })
 }
 
 function getSafeVideoUrl(value: string): string | null {
@@ -76,7 +45,7 @@ export function PostContentBlock({
 
             return (
                 <div
-                    className="post-rich-text my-4"
+                    className="post-rich-text post-content-block"
                     dangerouslySetInnerHTML={{
                         __html: sanitizedContent,
                     }}
@@ -91,19 +60,19 @@ export function PostContentBlock({
 
             return (
                 <figure
-                    className={`my-4 ${
+                    className={`post-content-image ${
                         imageWidthClasses[block.image_width]
                     }`}
                 >
                     <img
-                        className="img-fluid rounded w-100"
+                        className="w-100"
                         src={block.image}
                         alt={block.image_alt}
                         loading="lazy"
                     />
 
                     {block.caption && (
-                        <figcaption className="small text-secondary text-center mt-2">
+                        <figcaption>
                             {block.caption}
                         </figcaption>
                     )}
@@ -120,23 +89,20 @@ export function PostContentBlock({
             }
 
             return (
-                <div className="card my-4">
-                    <div className="card-body">
-                        <h2 className="h5 card-title">
-                            Video
-                        </h2>
-
-                        <p className="card-text text-secondary">
-                            This post contains an external video.
-                        </p>
+                <div className="post-video-card">
+                    <div className="post-video-card__icon" aria-hidden="true"><Icon icon={playIcon}/></div>
+                    <div>
+                        <span className="content-label">External media</span>
+                        <h2>Continue with this video</h2>
+                        <p>This part of the post opens safely in a new tab.</p>
 
                         <a
-                            className="btn btn-outline-primary"
+                            className="button button--secondary button--small"
                             href={safeVideoUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                         >
-                            Watch video
+                            Watch video <Icon icon={externalLinkIcon} aria-hidden="true"/>
                         </a>
                     </div>
                 </div>
@@ -145,15 +111,16 @@ export function PostContentBlock({
 
         case 'quote':
             return (
-                <figure className="my-4 p-4 border-start border-4 border-primary bg-body-tertiary rounded">
-                    <blockquote className="blockquote mb-2">
-                        <p className="mb-0">
+                <figure className="post-quote-block">
+                    <span aria-hidden="true">“</span>
+                    <blockquote>
+                        <p>
                             {block.content}
                         </p>
                     </blockquote>
 
                     {block.quote_attribution && (
-                        <figcaption className="blockquote-footer mb-0 mt-2">
+                        <figcaption>
                             {block.quote_attribution}
                         </figcaption>
                     )}
@@ -161,7 +128,7 @@ export function PostContentBlock({
             )
 
         case 'divider':
-            return <hr className="my-5"/>
+            return <hr className="my-5 post-content-divider"/>
 
         default:
             return null

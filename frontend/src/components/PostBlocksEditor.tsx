@@ -1,3 +1,10 @@
+import {Icon} from '@iconify/react'
+import arrowDownIcon from '@iconify-icons/lucide/arrow-down'
+import arrowUpIcon from '@iconify-icons/lucide/arrow-up'
+import editIcon from '@iconify-icons/lucide/edit-3'
+import layersIcon from '@iconify-icons/lucide/layers-3'
+import plusIcon from '@iconify-icons/lucide/plus'
+import trashIcon from '@iconify-icons/lucide/trash-2'
 import {
     useEffect,
     useState,
@@ -194,9 +201,10 @@ export function PostBlocksEditor({
 
     if (blocks === null && !loadError) {
         return (
-            <section className="card shadow-sm mb-4">
-                <div className="card-body p-4" role="status">
-                    Loading content blocks…
+            <section className="content-blocks-panel">
+                <div className="content-state content-state--compact" role="status">
+                    <span className="loading-ring" aria-hidden="true"/>
+                    <p>Loading content blocks…</p>
                 </div>
             </section>
         )
@@ -204,13 +212,13 @@ export function PostBlocksEditor({
 
     if (loadError) {
         return (
-            <section className="card shadow-sm mb-4">
-                <div className="card-body p-4">
-                    <h2 className="h4">Content blocks</h2>
-                    <div className="alert alert-danger" role="alert">
+            <section className="content-blocks-panel">
+                <div>
+                    <h2>Content blocks</h2>
+                    <div className="app-alert app-alert--danger" role="alert">
                         <p>{loadError}</p>
                         <button
-                            className="btn btn-outline-danger"
+                            className="button button--secondary button--small"
                             type="button"
                             onClick={() => {
                                 setReloadKey((current) => current + 1)
@@ -235,19 +243,21 @@ export function PostBlocksEditor({
         isReordering || busyBlockId !== null
 
     return (
-        <section className="card shadow-sm mb-4">
-            <div className="card-body p-4">
-                <div className="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <section className="content-blocks-panel">
+            <div>
+                <div className="content-blocks-panel__heading">
+                    <div className="content-blocks-panel__icon" aria-hidden="true"><Icon icon={layersIcon}/></div>
                     <div>
-                        <h2 className="h4 mb-2">Content blocks</h2>
-                        <p className="text-secondary mb-0">
+                        <p className="section-eyebrow">Article builder</p>
+                        <h2>Content blocks</h2>
+                        <p>
                             Build the main article from ordered text, image, video, quote, and divider blocks.
                         </p>
                     </div>
 
                     {activeEditor === null && (
                         <button
-                            className="btn btn-outline-primary"
+                            className="button button--primary button--small"
                             type="button"
                             onClick={() => {
                                 setActiveEditor('new')
@@ -255,29 +265,28 @@ export function PostBlocksEditor({
                             }}
                             disabled={controlsAreDisabled}
                         >
-                            Add block
+                            <Icon icon={plusIcon} aria-hidden="true"/> Add block
                         </button>
                     )}
                 </div>
 
                 {operationError && (
-                    <div className="alert alert-danger" role="alert">
+                    <div className="app-alert app-alert--danger" role="alert">
                         {operationError}
                     </div>
                 )}
 
                 {orderedBlocks.length === 0 && activeEditor !== 'new' && (
-                    <div className="text-center border rounded p-4 mb-3">
-                        <p className="text-secondary mb-0">
-                            No content blocks yet. Add one to build the article body.
-                        </p>
+                    <div className="content-blocks-empty">
+                        <Icon icon={layersIcon} aria-hidden="true"/>
+                        <div><h3>Your article canvas is empty</h3><p>No content blocks yet. Add one to build the article body.</p></div>
                     </div>
                 )}
 
-                <div className="d-grid gap-3">
+                <div className="content-block-list">
                     {orderedBlocks.map((block, index) => (
                         <article
-                            className="border rounded p-3"
+                            className="content-block-card"
                             key={block.id}
                             aria-label={`Content block ${index + 1}`}
                         >
@@ -293,17 +302,12 @@ export function PostBlocksEditor({
                                 />
                             ) : (
                                 <>
-                                    <header className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                                        <h3 className="h6 mb-0">
-                                            Block {index + 1} ·{' '}
-                                            {BLOCK_TYPE_LABELS[
-                                                block.block_type
-                                            ]}
-                                        </h3>
+                                    <header>
+                                        <div><span aria-hidden="true">{String(index + 1).padStart(2, '0')}</span><h3>Block {index + 1} · {BLOCK_TYPE_LABELS[block.block_type]}</h3></div>
 
-                                        <div className="d-flex flex-wrap gap-2">
+                                        <div className="content-block-card__actions">
                                             <button
-                                                className="btn btn-sm btn-outline-secondary"
+                                                className="block-action"
                                                 type="button"
                                                 aria-label={`Move block ${index + 1} up`}
                                                 onClick={() => {
@@ -315,10 +319,10 @@ export function PostBlocksEditor({
                                                     index === 0
                                                 }
                                             >
-                                                Move up
+                                                <Icon icon={arrowUpIcon} aria-hidden="true"/><span>Move up</span>
                                             </button>
                                             <button
-                                                className="btn btn-sm btn-outline-secondary"
+                                                className="block-action"
                                                 type="button"
                                                 aria-label={`Move block ${index + 1} down`}
                                                 onClick={() => {
@@ -331,10 +335,10 @@ export function PostBlocksEditor({
                                                         orderedBlocks.length - 1
                                                 }
                                             >
-                                                Move down
+                                                <Icon icon={arrowDownIcon} aria-hidden="true"/><span>Move down</span>
                                             </button>
                                             <button
-                                                className="btn btn-sm btn-outline-primary"
+                                                className="block-action"
                                                 type="button"
                                                 aria-label={`Edit block ${index + 1}`}
                                                 onClick={() => {
@@ -346,10 +350,10 @@ export function PostBlocksEditor({
                                                     activeEditor !== null
                                                 }
                                             >
-                                                Edit
+                                                <Icon icon={editIcon} aria-hidden="true"/><span>Edit</span>
                                             </button>
                                             <button
-                                                className="btn btn-sm btn-outline-danger"
+                                                className="block-action block-action--danger"
                                                 type="button"
                                                 aria-label={`Delete block ${index + 1}`}
                                                 onClick={() => {
@@ -362,12 +366,12 @@ export function PostBlocksEditor({
                                             >
                                                 {busyBlockId === block.id
                                                     ? 'Deleting…'
-                                                    : 'Delete'}
+                                                    : <><Icon icon={trashIcon} aria-hidden="true"/><span>Delete</span></>}
                                             </button>
                                         </div>
                                     </header>
 
-                                    <div className="border-top pt-2">
+                                    <div className="content-block-card__preview">
                                         <PostContentBlock block={block}/>
                                     </div>
                                 </>
@@ -377,7 +381,7 @@ export function PostBlocksEditor({
                 </div>
 
                 {activeEditor === 'new' && (
-                    <div className="mt-3">
+                    <div className="content-block-new">
                         <PostBlockForm
                             postId={postId}
                             position={nextPosition}

@@ -1,3 +1,7 @@
+import {Icon} from '@iconify/react'
+import arrowLeftIcon from '@iconify-icons/lucide/arrow-left'
+import arrowRightIcon from '@iconify-icons/lucide/arrow-right'
+import messageIcon from '@iconify-icons/lucide/message-circle'
 import {
     useEffect,
     useState,
@@ -96,19 +100,18 @@ export function PostCommentsSection({
 
     return (
         <section
-            className="col-lg-8 mx-auto mt-5 pt-4 border-top"
+            className="post-comments"
             aria-labelledby="post-comments-heading"
         >
-            <div className="d-flex justify-content-between align-items-center gap-3 mb-4">
-                <h2
-                    className="h3 mb-0"
-                    id="post-comments-heading"
-                >
-                    Comments
-                </h2>
+            <div className="post-comments__heading">
+                <div>
+                    <p className="section-eyebrow">Student conversation</p>
+                    <h2 id="post-comments-heading">Comments</h2>
+                    <p>Responses from readers across the ThoughtHub community.</p>
+                </div>
 
                 {commentsPage && (
-                    <span className="text-secondary">
+                    <span className="post-count">
                         {commentsPage.count}{' '}
                         {commentsPage.count === 1
                             ? 'comment'
@@ -125,23 +128,20 @@ export function PostCommentsSection({
 
             {isLoading && (
                 <div
-                    className="text-center py-4"
+                    className="content-state content-state--compact"
                     role="status"
                 >
-                    <div
-                        className="spinner-border spinner-border-sm text-primary me-2"
-                        aria-hidden="true"
-                    />
-                    Loading comments…
+                    <span className="loading-ring" aria-hidden="true"/>
+                    <p>Loading comments…</p>
                 </div>
             )}
 
             {!isLoading && loadError && (
-                <div className="alert alert-danger" role="alert">
-                    <p className="mb-3">{loadError}</p>
+                <div className="app-alert app-alert--danger" role="alert">
+                    <p>{loadError}</p>
 
                     <button
-                        className="btn btn-outline-danger btn-sm"
+                        className="button button--secondary button--small"
                         type="button"
                         onClick={() => {
                             setReloadKey(
@@ -157,9 +157,10 @@ export function PostCommentsSection({
             {!isLoading &&
                 !loadError &&
                 commentsPage?.results.length === 0 && (
-                    <p className="text-secondary">
-                        No comments yet.
-                    </p>
+                    <div className="comments-empty-state">
+                        <Icon icon={messageIcon} aria-hidden="true"/>
+                        <div><h3>No comments yet.</h3><p>Be the first student to add a thoughtful response.</p></div>
+                    </div>
                 )}
 
             {!isLoading &&
@@ -167,21 +168,22 @@ export function PostCommentsSection({
                 commentsPage &&
                 commentsPage.results.length > 0 && (
                     <>
-                        <ol className="list-unstyled d-grid gap-3 mb-0">
+                        <ol className="public-comment-list">
                             {commentsPage.results.map(
-                                (comment) => (
+                                (comment, index) => (
                                     <li key={comment.id}>
-                                        <article className="card">
-                                            <div className="card-body">
-                                                <header className="d-flex flex-wrap justify-content-between gap-2 mb-3">
-                                                    <h3 className="h6 mb-0">
+                                        <article className="public-comment-card">
+                                                <header>
+                                                    <div className="public-comment-card__author">
+                                                        <span aria-hidden="true">{comment.author_username.slice(0, 1).toUpperCase()}</span>
+                                                        <div><h3>
                                                         {
                                                             comment.author_username
                                                         }
-                                                    </h3>
+                                                        </h3><small>ThoughtHub reader · Reply {String(index + 1).padStart(2, '0')}</small></div>
+                                                    </div>
 
                                                     <time
-                                                        className="small text-secondary"
                                                         dateTime={
                                                             comment.created_at
                                                         }
@@ -193,7 +195,7 @@ export function PostCommentsSection({
                                                 </header>
 
                                                 <p
-                                                    className="mb-0"
+                                                    className="public-comment-card__content"
                                                     style={{
                                                         whiteSpace:
                                                             'pre-wrap',
@@ -201,7 +203,6 @@ export function PostCommentsSection({
                                                 >
                                                     {comment.content}
                                                 </p>
-                                            </div>
                                         </article>
                                     </li>
                                 ),
@@ -211,11 +212,11 @@ export function PostCommentsSection({
                         {(commentsPage.previous ||
                             commentsPage.next) && (
                             <nav
-                                className="d-flex justify-content-center align-items-center gap-3 mt-4"
+                                className="pagination-bar"
                                 aria-label="Comment pages"
                             >
                                 <button
-                                    className="btn btn-outline-primary btn-sm"
+                                    className="button button--secondary button--small"
                                     type="button"
                                     disabled={
                                         commentsPage.previous === null
@@ -229,18 +230,17 @@ export function PostCommentsSection({
                                         )
                                     }}
                                 >
-                                    Previous comments
+                                    <Icon icon={arrowLeftIcon} aria-hidden="true"/> Previous comments
                                 </button>
 
                                 <span
-                                    className="small"
                                     aria-live="polite"
                                 >
                                     Page {page}
                                 </span>
 
                                 <button
-                                    className="btn btn-outline-primary btn-sm"
+                                    className="button button--secondary button--small"
                                     type="button"
                                     disabled={
                                         commentsPage.next === null
@@ -252,7 +252,7 @@ export function PostCommentsSection({
                                         )
                                     }}
                                 >
-                                    Next comments
+                                    Next comments <Icon icon={arrowRightIcon} aria-hidden="true"/>
                                 </button>
                             </nav>
                         )}

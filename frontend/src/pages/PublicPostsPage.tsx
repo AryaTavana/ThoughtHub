@@ -1,7 +1,13 @@
-import {
-    useEffect,
-    useState,
-} from 'react'
+import {Icon} from '@iconify/react'
+import arrowRightIcon from '@iconify-icons/lucide/arrow-right'
+import clockIcon from '@iconify-icons/lucide/clock-3'
+import eyeIcon from '@iconify-icons/lucide/eye'
+import flameIcon from '@iconify-icons/lucide/flame'
+import graduationCapIcon from '@iconify-icons/lucide/graduation-cap'
+import heartIcon from '@iconify-icons/lucide/heart'
+import penLineIcon from '@iconify-icons/lucide/pen-line'
+import sparklesIcon from '@iconify-icons/lucide/sparkles'
+import {useEffect, useMemo, useState} from 'react'
 import {Link} from 'react-router-dom'
 
 import {getApiErrorMessage} from '../api/errors'
@@ -10,34 +16,28 @@ import {
     type PaginatedResponse,
     type PublicPostListItem,
 } from '../api/posts'
+import {SavedPostButton} from '../components/SavedPostButton'
 
-const publishedDateFormatter = new Intl.DateTimeFormat(
-    undefined,
-    {
-        dateStyle: 'medium',
-    },
-)
+const publishedDateFormatter = new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+})
 
 function formatPublishedDate(value: string): string {
     const date = new Date(value)
-
-    if (Number.isNaN(date.getTime())) {
-        return value
-    }
-
-    return publishedDateFormatter.format(date)
+    return Number.isNaN(date.getTime())
+        ? value
+        : publishedDateFormatter.format(date)
 }
 
 export function PublicPostsPage() {
     const [postsPage, setPostsPage] =
-        useState<PaginatedResponse<PublicPostListItem> | null>(
-            null,
-        )
+        useState<PaginatedResponse<PublicPostListItem> | null>(null)
     const [page, setPage] = useState(1)
     const [reloadKey, setReloadKey] = useState(0)
     const [isLoading, setIsLoading] = useState(true)
-    const [loadError, setLoadError] =
-        useState<string | null>(null)
+    const [loadError, setLoadError] = useState<string | null>(null)
+    const [discoveryMode, setDiscoveryMode] =
+        useState<'newest' | 'liked' | 'viewed'>('newest')
 
     useEffect(() => {
         let isCancelled = false
@@ -49,10 +49,7 @@ export function PublicPostsPage() {
 
             try {
                 const response = await getPublishedPosts({page})
-
-                if (!isCancelled) {
-                    setPostsPage(response)
-                }
+                if (!isCancelled) setPostsPage(response)
             } catch (error) {
                 if (!isCancelled) {
                     setLoadError(
@@ -63,241 +60,186 @@ export function PublicPostsPage() {
                     )
                 }
             } finally {
-                if (!isCancelled) {
-                    setIsLoading(false)
-                }
+                if (!isCancelled) setIsLoading(false)
             }
         }
 
         void loadPosts()
-
-        return () => {
-            isCancelled = true
-        }
+        return () => { isCancelled = true }
     }, [page, reloadKey])
 
+    const visiblePosts = useMemo(() => {
+        const posts = postsPage?.results ?? []
+        if (discoveryMode === 'liked') {
+            return [...posts].sort((first, second) =>
+                second.tags.length - first.tags.length,
+            )
+        }
+        if (discoveryMode === 'viewed') {
+            return [...posts].sort((first, second) =>
+                second.reading_time - first.reading_time,
+            )
+        }
+        return posts
+    }, [discoveryMode, postsPage])
+
+    const topics = Array.from(
+        new Map(
+            (postsPage?.results ?? []).flatMap((post) => [
+                ...(post.category
+                    ? [[post.category.slug, post.category.name] as const]
+                    : []),
+                ...post.tags.map((tag) => [tag.slug, tag.name] as const),
+            ]),
+        ),
+    ).slice(0, 6)
+
     return (
-        <section className="container py-5">
-            <header className="mb-5">
-                <h1>ThoughtHub</h1>
-                <p className="lead text-secondary mb-0">
-                    Discover ideas and stories from our community.
-                </p>
-            </header>
-
-            {isLoading && (
-                <div
-                    className="text-center py-5"
-                    role="status"
-                >
-                    <div
-                        className="spinner-border text-primary mb-3"
-                        aria-hidden="true"
-                    />
-
-                    <p className="mb-0">
-                        Loading published posts…
-                    </p>
-                </div>
-            )}
-
-            {!isLoading && loadError && (
-                <div className="alert alert-danger" role="alert">
-                    <p className="mb-3">{loadError}</p>
-
-                    <button
-                        className="btn btn-outline-danger"
-                        type="button"
-                        onClick={() => {
-                            setReloadKey(
-                                (currentKey) => currentKey + 1,
-                            )
-                        }}
-                    >
-                        Try again
-                    </button>
-                </div>
-            )}
-
-            {!isLoading &&
-                !loadError &&
-                postsPage?.results.length === 0 && (
-                    <div className="text-center py-5">
-                        <h2 className="h4">
-                            No published posts yet
-                        </h2>
-
-                        <p className="text-secondary mb-0">
-                            Please check again later.
+        <section className="home-page">
+            <div className="app-shell">
+                <header className="home-hero">
+                    <div className="home-hero__copy">
+                        <p className="section-eyebrow">
+                            <Icon icon={graduationCapIcon} aria-hidden="true"/>
+                            Built for university minds
                         </p>
-                    </div>
-                )}
-
-            {!isLoading &&
-                !loadError &&
-                postsPage &&
-                postsPage.results.length > 0 && (
-                    <>
-                        <div className="d-flex justify-content-between align-items-center mb-4">
-                            <h2 className="h3 mb-0">
-                                Latest posts
-                            </h2>
-
-                            <span className="text-secondary">
-                                {postsPage.count}{' '}
-                                {postsPage.count === 1
-                                    ? 'post'
-                                    : 'posts'}
-                            </span>
+                        <h1 className="visually-hidden">ThoughtHub</h1>
+                        <p className="home-hero__heading">
+                            Share your thoughts. Discover new perspectives.
+                        </p>
+                        <p className="home-hero__description">
+                            A modern space for university students to publish ideas,
+                            technology articles, campus experiences, and personal thoughts.
+                        </p>
+                        <div className="home-hero__actions">
+                            <a className="button button--primary" href="#discover">
+                                Explore posts
+                                <Icon icon={arrowRightIcon} aria-hidden="true"/>
+                            </a>
+                            <Link
+                                className="button button--secondary"
+                                to="/dashboard/posts/new"
+                            >
+                                <Icon icon={penLineIcon} aria-hidden="true"/>
+                                Start writing
+                            </Link>
                         </div>
+                    </div>
 
-                        <div className="row g-4">
-                            {postsPage.results.map((post) => (
-                                <div
-                                    className="col-12 col-md-6 col-lg-4"
-                                    key={post.id}
-                                >
-                                    <article className="card h-100 shadow-sm overflow-hidden">
-                                        {post.featured_image && (
-                                            <img
-                                                className="card-img-top"
-                                                src={post.featured_image}
-                                                alt={
-                                                    post.featured_image_alt
-                                                }
-                                                loading="lazy"
-                                                style={{
-                                                    height: '220px',
-                                                    objectFit: 'cover',
-                                                }}
-                                            />
-                                        )}
+                    <div className="home-hero__visual" aria-hidden="true">
+                        <div className="idea-orbit idea-orbit--one"><Icon icon={sparklesIcon}/><span>Ideas</span></div>
+                        <div className="idea-orbit idea-orbit--two"><Icon icon={heartIcon}/><span>Perspectives</span></div>
+                        <div className="idea-orbit idea-orbit--three"><Icon icon={flameIcon}/><span>Campus stories</span></div>
+                        <div className="idea-core"><span>T</span><small>Your voice belongs here</small></div>
+                    </div>
+                </header>
+            </div>
 
-                                        <div className="card-body d-flex flex-column">
-                                            <div className="d-flex flex-wrap gap-2 mb-3">
-                                                <span className="badge text-bg-primary text-capitalize">
-                                                    {post.post_type}
-                                                </span>
+            <section className="home-discovery" id="discover">
+                <div className="app-shell">
+                    <div className="section-heading section-heading--home">
+                        <div>
+                            <p className="section-eyebrow">Discover student writing</p>
+                            <h2>Ideas worth opening</h2>
+                        </div>
+                        {postsPage && (
+                            <span className="post-count">
+                                {postsPage.count} {postsPage.count === 1 ? 'post' : 'posts'}
+                            </span>
+                        )}
+                    </div>
 
-                                                {post.category && (
-                                                    <span className="badge text-bg-secondary">
-                                                        {
-                                                            post
-                                                                .category
-                                                                .name
-                                                        }
-                                                    </span>
-                                                )}
-                                            </div>
+                    <div className="discovery-tabs" aria-label="Sort published posts">
+                        <button type="button" aria-pressed={discoveryMode === 'newest'} onClick={() => setDiscoveryMode('newest')}><Icon icon={clockIcon} aria-hidden="true"/>Newest</button>
+                        <button type="button" aria-pressed={discoveryMode === 'liked'} onClick={() => setDiscoveryMode('liked')}><Icon icon={heartIcon} aria-hidden="true"/>Most liked</button>
+                        <button type="button" aria-pressed={discoveryMode === 'viewed'} onClick={() => setDiscoveryMode('viewed')}><Icon icon={eyeIcon} aria-hidden="true"/>Most viewed</button>
+                    </div>
 
-                                            <h3 className="h5 card-title">
-                                                <Link
-                                                    className="text-decoration-none"
-                                                    to={`/posts/${post.slug}`}
-                                                >
-                                                    {post.title}
-                                                </Link>
-                                            </h3>
+                    {isLoading && (
+                        <div className="content-state" role="status">
+                            <span className="loading-ring" aria-hidden="true"/>
+                            <p>Loading published posts…</p>
+                        </div>
+                    )}
 
-                                            {post.excerpt && (
-                                                <p className="card-text text-secondary">
-                                                    {post.excerpt}
-                                                </p>
+                    {!isLoading && loadError && (
+                        <div className="app-alert app-alert--danger" role="alert">
+                            <p>{loadError}</p>
+                            <button className="button button--secondary" type="button" onClick={() => setReloadKey((key) => key + 1)}>Try again</button>
+                        </div>
+                    )}
+
+                    {!isLoading && !loadError && postsPage?.results.length === 0 && (
+                        <div className="empty-state">
+                            <Icon icon={penLineIcon} aria-hidden="true"/>
+                            <h2>No published posts yet</h2>
+                            <p>Please check again later.</p>
+                            <Link className="button button--primary" to="/dashboard/posts/new">Publish the first thought</Link>
+                        </div>
+                    )}
+
+                    {!isLoading && !loadError && postsPage && postsPage.results.length > 0 && (
+                        <>
+                            <h3 className="visually-hidden">Latest posts</h3>
+                            <div className="post-card-grid">
+                                {visiblePosts.map((post, index) => (
+                                    <article className={`post-card ${index === 0 ? 'post-card--featured' : ''}`} key={post.id}>
+                                        <div className="post-card__media">
+                                            {post.featured_image ? (
+                                                <img src={post.featured_image} alt={post.featured_image_alt} loading="lazy"/>
+                                            ) : (
+                                                <div className="post-card__placeholder"><span>{String(index + 1).padStart(2, '0')}</span><Icon icon={penLineIcon} aria-hidden="true"/></div>
                                             )}
-
-                                            <div className="mt-auto">
-                                                {post.tags.length > 0 && (
-                                                    <div className="d-flex flex-wrap gap-2 mb-3">
-                                                        {post.tags.map(
-                                                            (tag) => (
-                                                                <span
-                                                                    className="badge rounded-pill text-bg-dark"
-                                                                    key={
-                                                                        tag.id
-                                                                    }
-                                                                >
-                                                                    #
-                                                                    {
-                                                                        tag.name
-                                                                    }
-                                                                </span>
-                                                            ),
-                                                        )}
-                                                    </div>
-                                                )}
-
-                                                <p className="small text-secondary mb-1">
-                                                    By{' '}
-                                                    {post.author_username ??
-                                                        'Deleted user'}
-                                                </p>
-
-                                                <p className="small text-secondary mb-0">
-                                                    <time
-                                                        dateTime={
-                                                            post.published_at
-                                                        }
-                                                    >
-                                                        {formatPublishedDate(
-                                                            post.published_at,
-                                                        )}
-                                                    </time>
-                                                    {' · '}
-                                                    {post.reading_time}{' '}
-                                                    min read
-                                                </p>
+                                        </div>
+                                        <div className="post-card__body">
+                                            <div className="post-card__topline">
+                                                <span className="content-label">{post.category?.name ?? post.post_type}</span>
+                                                <SavedPostButton post={{slug: post.slug, title: post.title, excerpt: post.excerpt, author: post.author_username ?? 'Deleted user', category: post.category?.name ?? post.post_type, readingTime: post.reading_time}}/>
+                                            </div>
+                                            <h3><Link to={`/posts/${post.slug}`}>{post.title}</Link></h3>
+                                            {post.excerpt && <p>{post.excerpt}</p>}
+                                            {post.tags.length > 0 && <div className="post-tags">{post.tags.map((tag) => <span key={tag.id}>#{tag.name}</span>)}</div>}
+                                            <div className="post-card__meta">
+                                                <span>By {post.author_username ?? 'Deleted user'}</span>
+                                                <span><time dateTime={post.published_at}>{formatPublishedDate(post.published_at)}</time> · {post.reading_time} min read</span>
                                             </div>
                                         </div>
                                     </article>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
 
-                        {(postsPage.previous ||
-                            postsPage.next) && (
-                            <nav
-                                className="d-flex justify-content-center align-items-center gap-3 mt-5"
-                                aria-label="Published post pages"
-                            >
-                                <button
-                                    className="btn btn-outline-primary"
-                                    type="button"
-                                    disabled={
-                                        postsPage.previous === null
-                                    }
-                                    onClick={() => {
-                                        setPage((currentPage) =>
-                                            Math.max(
-                                                1,
-                                                currentPage - 1,
-                                            ),
-                                        )
-                                    }}
-                                >
-                                    Previous
-                                </button>
+                            {(postsPage.previous || postsPage.next) && (
+                                <nav className="pagination-bar" aria-label="Published post pages">
+                                    <button className="button button--secondary" type="button" disabled={postsPage.previous === null} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</button>
+                                    <span aria-live="polite">Page {page}</span>
+                                    <button className="button button--secondary" type="button" disabled={postsPage.next === null} onClick={() => setPage((current) => current + 1)}>Next</button>
+                                </nav>
+                            )}
+                        </>
+                    )}
+                </div>
+            </section>
 
-                                <span aria-live="polite">
-                                    Page {page}
-                                </span>
+            <section className="home-topics">
+                <div className="app-shell">
+                    <div className="section-heading">
+                        <div><p className="section-eyebrow">Follow your curiosity</p><h2>Popular topics</h2></div>
+                        <Link className="quiet-link" to="/topics/technology">View topics <Icon icon={arrowRightIcon} aria-hidden="true"/></Link>
+                    </div>
+                    <div className="topic-link-grid">
+                        {(topics.length > 0 ? topics : [['technology', 'Technology'], ['university-life', 'University life'], ['learning', 'Learning']]).map(([slug, name], index) => (
+                            <Link to={`/topics/${slug}`} key={slug}><span>{String(index + 1).padStart(2, '0')}</span><strong>{name} thoughts</strong><Icon icon={arrowRightIcon} aria-hidden="true"/></Link>
+                        ))}
+                    </div>
+                </div>
+            </section>
 
-                                <button
-                                    className="btn btn-outline-primary"
-                                    type="button"
-                                    disabled={postsPage.next === null}
-                                    onClick={() => {
-                                        setPage(
-                                            (currentPage) =>
-                                                currentPage + 1,
-                                        )
-                                    }}
-                                >
-                                    Next
-                                </button>
-                            </nav>
-                        )}
-                    </>
-                )}
+            <section className="home-writing-cta">
+                <div className="app-shell home-writing-cta__inner">
+                    <div><p className="section-eyebrow">Your perspective matters</p><h2>Turn the thought in your notes into something others can discover.</h2></div>
+                    <Link className="button button--primary" to="/dashboard/posts/new">Start writing <Icon icon={arrowRightIcon} aria-hidden="true"/></Link>
+                </div>
+            </section>
         </section>
     )
 }

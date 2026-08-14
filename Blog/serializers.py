@@ -1,6 +1,14 @@
 from rest_framework import serializers
 
-from .models import Category, Comment, Post, PostBlock, Tag
+from .models import (
+    Category,
+    Comment,
+    Notification,
+    Post,
+    PostBlock,
+    SavedPost,
+    Tag,
+)
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -252,6 +260,80 @@ class PublicPostDetailSerializer(PublicPostListSerializer):
             'updated_at',
         )
         read_only_fields = fields
+
+
+class SavedPostSerializer(serializers.ModelSerializer):
+    post = PublicPostListSerializer(read_only=True)
+
+    class Meta:
+        model = SavedPost
+        fields = (
+            'id',
+            'post',
+            'saved_at',
+        )
+        read_only_fields = fields
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    actor_username = serializers.CharField(
+        source='actor.username',
+        read_only=True,
+        default=None,
+    )
+    post_title = serializers.CharField(
+        source='post.title',
+        read_only=True,
+        default=None,
+    )
+    post_slug = serializers.CharField(
+        source='post.slug',
+        read_only=True,
+        default=None,
+    )
+    target_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Notification
+        fields = (
+            'id',
+            'kind',
+            'title',
+            'message',
+            'actor_username',
+            'post_title',
+            'post_slug',
+            'target_url',
+            'is_read',
+            'created_at',
+        )
+        read_only_fields = (
+            'id',
+            'kind',
+            'title',
+            'message',
+            'actor_username',
+            'post_title',
+            'post_slug',
+            'target_url',
+            'created_at',
+        )
+
+    def get_target_url(self, notification):
+        if (
+            notification.kind == Notification.Kind.NEW_COMMENT
+            and notification.post
+            and notification.post.is_public
+        ):
+            return f'/posts/{notification.post.slug}#discussion'
+
+        if (
+            notification.kind == Notification.Kind.POST_REMOVED
+            and notification.post_id
+        ):
+            return f'/dashboard/posts/{notification.post_id}/removed'
+
+        return '/dashboard'
 
 
 class AuthorPostListSerializer(PublicPostListSerializer):

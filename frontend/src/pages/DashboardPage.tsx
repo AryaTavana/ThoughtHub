@@ -88,7 +88,16 @@ export function DashboardPage() {
                     <div className="dashboard-post-list">
                         {postsPage.results.map((post) => (
                             <article className="dashboard-post" key={post.id}>
-                                <div className="dashboard-post__icon"><Icon icon={post.status === 'removed' ? messageIcon : fileTextIcon} aria-hidden="true"/></div>
+                                <div className={`dashboard-post__visual ${post.featured_image ? 'dashboard-post__visual--image' : ''}`}>
+                                    {post.featured_image ? (
+                                        <img
+                                            src={post.featured_image}
+                                            alt={post.featured_image_alt}
+                                        />
+                                    ) : (
+                                        <Icon icon={post.status === 'removed' ? messageIcon : fileTextIcon} aria-hidden="true"/>
+                                    )}
+                                </div>
                                 <div className="dashboard-post__body">
                                     <div className="dashboard-post__heading"><div><span className={`status-badge status-badge--${post.status}`}>{post.status.replace('_', ' ')}</span><h3>{post.title}</h3></div><div className="dashboard-post__actions"><Link className="button button--secondary button--small" to={`/dashboard/posts/${post.id}/edit`}><Icon icon={editIcon} aria-hidden="true"/>Edit</Link>{post.status === 'published' && <Link className="button button--secondary button--small" to={`/posts/${post.slug}`}><Icon icon={eyeIcon} aria-hidden="true"/>View</Link>}</div></div>
                                     <p className="dashboard-post__date">Updated {formatUpdatedDate(post.updated_at)}</p>

@@ -17,6 +17,7 @@ import {getApiErrorMessage} from '../api/errors'
 import {useAuth} from '../auth/useAuth'
 import {useNotifications} from '../useNotifications'
 import {ThemeToggle} from './ThemeToggle'
+import {ThoughtHubIcon} from './ThoughtHubIcon'
 
 export function AppNavbar() {
     const {
@@ -125,7 +126,7 @@ export function AppNavbar() {
                         aria-label="ThoughtHub"
                         onClick={closeMenu}
                     >
-                        <span className="app-brand__mark" aria-hidden="true">T</span>
+                        <ThoughtHubIcon className="app-brand__mark"/>
                         <span>ThoughtHub</span>
                     </Link>
 

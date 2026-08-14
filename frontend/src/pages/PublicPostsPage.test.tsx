@@ -125,6 +125,11 @@ describe('PublicPostsPage', () => {
     expect(getPublishedPostsMock).toHaveBeenCalledWith({
       page: 1,
     })
+    expect(
+      document.querySelectorAll(
+        '.idea-core .thought-hub-icon__image',
+      ),
+    ).toHaveLength(2)
   })
 
   it('renders published post data and a detail link', async () => {
@@ -161,6 +166,32 @@ describe('PublicPostsPage', () => {
         name: 'Save Learning Django and React',
       }),
     ).toHaveTextContent('Save')
+  })
+
+  it('renders the uploaded banner in the post card media area', async () => {
+    getPublishedPostsMock.mockResolvedValue(
+      createPage(firstPost),
+    )
+
+    renderPostsPage()
+
+    const banner = await screen.findByRole('img', {
+      name: 'Django and React logos',
+    })
+    expect(banner).toHaveAttribute('src', '/media/posts/guide.jpg')
+    expect(banner).toHaveAttribute('loading', 'lazy')
+    expect(banner.parentElement).toHaveClass('post-card__media')
+  })
+
+  it('keeps tags in the dedicated aligned card slot', async () => {
+    getPublishedPostsMock.mockResolvedValue(
+      createPage(firstPost),
+    )
+
+    renderPostsPage()
+
+    const tag = await screen.findByText('#Django')
+    expect(tag.closest('.post-card__tag-slot')).not.toBeNull()
   })
 
   it('renders an empty state when no posts are published', async () => {

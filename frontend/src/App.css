@@ -22,6 +22,7 @@
 .app-navbar {
   background: color-mix(in srgb, var(--background-navbar) 94%, transparent);
   border-bottom: 1px solid var(--border-default);
+  box-shadow: var(--shadow-sm);
   position: relative;
 }
 
@@ -41,20 +42,40 @@
   color: var(--text-heading) !important;
   display: inline-flex;
   font-size: 1rem;
-  font-weight: 500;
+  font-weight: 700;
   gap: 10px;
+  letter-spacing: -.02em;
   text-decoration: none;
 }
 
 .app-brand__mark {
+  height: 38px;
+  width: 43px;
+}
+
+.thought-hub-icon {
   align-items: center;
-  background: var(--text-heading);
-  border-radius: 11px;
-  color: var(--background-body);
   display: inline-flex;
-  height: 35px;
+  flex: 0 0 auto;
   justify-content: center;
-  width: 35px;
+}
+
+.thought-hub-icon__image {
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+.thought-hub-icon__image--light {
+  display: none;
+}
+
+:root[data-theme='light'] .thought-hub-icon__image--dark {
+  display: none;
+}
+
+:root[data-theme='light'] .thought-hub-icon__image--light {
+  display: block;
 }
 
 .app-navbar__links,
@@ -572,9 +593,15 @@
 
 .home-hero__visual {
   aspect-ratio: 1;
-  background: radial-gradient(circle at center, var(--background-surface-3), transparent 66%);
+  background:
+    radial-gradient(
+      circle at center,
+      color-mix(in srgb, var(--brand-secondary) 18%, var(--background-surface-3)),
+      color-mix(in srgb, var(--brand-primary) 6%, var(--background-body)) 66%
+    );
   border: 1px solid var(--border-default);
   border-radius: 50%;
+  box-shadow: inset 0 0 80px color-mix(in srgb, var(--brand-primary) 7%, transparent);
   max-width: 440px;
   position: relative;
 }
@@ -604,6 +631,8 @@
 }
 
 .idea-core {
+  background: color-mix(in srgb, var(--brand-primary) 7%, var(--background-surface));
+  border-color: color-mix(in srgb, var(--brand-primary) 35%, var(--border-default));
   border-radius: 24px;
   flex-direction: column;
   gap: 8px;
@@ -611,16 +640,9 @@
   justify-content: center;
 }
 
-.idea-core > span {
-  align-items: center;
-  background: var(--text-heading);
-  border-radius: 12px;
-  color: var(--background-body);
-  display: flex;
-  font-size: 1.25rem;
-  height: 42px;
-  justify-content: center;
-  width: 42px;
+.idea-core__mark {
+  height: 51px;
+  width: 58px;
 }
 
 .idea-core small {
@@ -637,9 +659,13 @@
 }
 
 .idea-orbit svg {
+  color: var(--brand-primary);
   height: 15px;
   width: 15px;
 }
+
+.idea-orbit--two svg { color: var(--brand-secondary); }
+.idea-orbit--three svg { color: var(--brand-accent); }
 
 .idea-orbit--one { left: -4%; top: 21%; }
 .idea-orbit--two { right: -5%; top: 37%; }
@@ -820,6 +846,18 @@
   padding: 4px 8px;
 }
 
+.post-card__tag-slot {
+  align-items: flex-end;
+  display: flex;
+  margin-top: auto;
+  min-height: 42px;
+  padding-top: 15px;
+}
+
+.post-card__tag-slot .post-tags {
+  margin-top: 0;
+}
+
 .post-card__meta {
   border-top: 1px solid var(--border-light);
   color: var(--text-secondary);
@@ -828,7 +866,7 @@
   font-size: .78rem;
   gap: 8px;
   justify-content: space-between;
-  margin-top: auto;
+  margin-top: 15px;
   padding-top: 17px;
 }
 
@@ -1312,7 +1350,7 @@
   padding: 22px 4px;
 }
 
-.dashboard-post__icon {
+.dashboard-post__visual {
   align-items: center;
   background: var(--background-surface-2);
   border: 1px solid var(--border-default);
@@ -1323,7 +1361,9 @@
   width: 42px;
 }
 
-.dashboard-post__icon svg { height: 18px; width: 18px; }
+.dashboard-post__visual svg { height: 18px; width: 18px; }
+.dashboard-post__visual--image { overflow: hidden; }
+.dashboard-post__visual img { height: 100%; object-fit: cover; width: 100%; }
 .dashboard-post__heading { align-items: flex-start; display: flex; gap: 20px; justify-content: space-between; }
 .dashboard-post__heading h3 { font-size: 1rem; font-weight: 500; margin: 6px 0 0; }
 .dashboard-post__actions { display: flex; flex: 0 0 auto; gap: 7px; }
@@ -1558,6 +1598,22 @@
 }
 
 .post-article__featured-image + .post-article__reading-layout { margin-top: 0; }
+
+.editor-featured-image-preview {
+  aspect-ratio: 16 / 7;
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  display: block;
+  margin-bottom: 18px;
+  object-fit: cover;
+  width: 100%;
+}
+
+.editor-featured-image-selection {
+  color: var(--status-success);
+  font-size: .8rem;
+  margin: 8px 0 0;
+}
 
 .post-article__reading-rail {
   align-self: start;

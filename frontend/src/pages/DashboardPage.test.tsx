@@ -57,8 +57,8 @@ const publishedPost: AuthorPostListItem = {
       slug: 'django',
     },
   ],
-  featured_image: null,
-  featured_image_alt: '',
+  featured_image: '/media/posts/architecture.jpg',
+  featured_image_alt: 'Application architecture diagram',
   post_type: 'tutorial',
   published_at: '2026-07-28T08:45:00Z',
   reading_time: 6,
@@ -75,6 +75,8 @@ const removedPost: AuthorPostListItem = {
   slug: 'article-needing-revision',
   published_at: null,
   status: 'removed',
+  featured_image: null,
+  featured_image_alt: '',
   review_feedback: 'Please add sources for the main claim.',
   updated_at: '2026-07-30T10:00:00Z',
 }
@@ -179,6 +181,11 @@ describe('DashboardPage', () => {
     expect(
       screen.getByRole('link', { name: 'New post' }),
     ).toHaveAttribute('href', '/dashboard/posts/new')
+    expect(
+      screen.getByRole('img', {
+        name: 'Application architecture diagram',
+      }),
+    ).toHaveAttribute('src', '/media/posts/architecture.jpg')
   })
 
   it('shows an author their comment status and moderation feedback', async () => {

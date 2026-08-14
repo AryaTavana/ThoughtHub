@@ -206,6 +206,32 @@ describe('PostEditorPage', () => {
     ).toBeInTheDocument()
   })
 
+  it('adds an accessible banner image to a post', async () => {
+    const user = userEvent.setup()
+    const banner = new File(['banner'], 'campus-story.jpg', {
+      type: 'image/jpeg',
+    })
+    renderEditor()
+
+    await screen.findByRole('heading', { name: 'New post' })
+    await user.type(screen.getByLabelText('Title'), 'Campus story')
+    await user.upload(screen.getByLabelText('Banner image'), banner)
+    await user.type(
+      screen.getByLabelText('Alternative text'),
+      'Students sharing ideas on campus',
+    )
+    await user.click(
+      screen.getByRole('button', { name: 'Create draft' }),
+    )
+
+    expect(createAuthorPostMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        featured_image: banner,
+        featured_image_alt: 'Students sharing ideas on campus',
+      }),
+    )
+  })
+
   it('loads, updates, and immediately republishes a removed post', async () => {
     const user = userEvent.setup()
     renderEditor('/dashboard/posts/20/edit')

@@ -440,6 +440,30 @@ describe('author posts API service', () => {
     )
   })
 
+  it('uploads a post banner with multipart input', async () => {
+    apiRequestMock.mockResolvedValue(authorPostDetail)
+    const banner = new File(['banner'], 'campus-story.jpg', {
+      type: 'image/jpeg',
+    })
+
+    await createAuthorPost({
+      ...authorPostInput,
+      featured_image: banner,
+      featured_image_alt: 'Students sharing ideas on campus',
+    })
+
+    const request = apiRequestMock.mock.calls[0]?.[1]
+    expect(request?.method).toBe('POST')
+    expect(request?.body).toBeInstanceOf(FormData)
+
+    const body = request?.body as FormData
+    expect(body.get('featured_image')).toBe(banner)
+    expect(body.get('featured_image_alt')).toBe(
+      'Students sharing ideas on campus',
+    )
+    expect(body.getAll('tags')).toEqual(['5', '8'])
+  })
+
   it('updates an existing author post', async () => {
     apiRequestMock.mockResolvedValue(authorPostDetail)
 

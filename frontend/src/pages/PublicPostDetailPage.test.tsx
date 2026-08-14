@@ -215,6 +215,25 @@ describe('PublicPostDetailPage', () => {
     expect(document.title).toBe('ThoughtHub tests')
   })
 
+  it('renders the uploaded banner above the reading layout', async () => {
+    const { container } = renderDetailPage()
+
+    const banner = await screen.findByRole('img', {
+      name: 'Django and React logos',
+    })
+    const figure = banner.closest('figure')
+    const readingLayout = container.querySelector(
+      '.post-article__reading-layout',
+    )
+
+    expect(figure).toHaveClass('post-article__featured-image')
+    expect(readingLayout).not.toBeNull()
+    expect(
+      figure!.compareDocumentPosition(readingLayout!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
   it('keeps introduction markup escaped as ordinary text', async () => {
     getPublishedPostMock.mockResolvedValue({
       ...publishedPost,

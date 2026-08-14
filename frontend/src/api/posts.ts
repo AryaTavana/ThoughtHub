@@ -90,11 +90,35 @@ export interface AuthorPostInput {
     content: string
     category: number | null
     tags: number[]
+    featured_image?: File
     featured_image_alt: string
     post_type: PostType
     allow_comments: boolean
     meta_title: string
     meta_description: string
+}
+
+function createAuthorPostFormData(input: AuthorPostInput): FormData {
+    const formData = new FormData()
+
+    formData.set('title', input.title)
+    formData.set('excerpt', input.excerpt)
+    formData.set('content', input.content)
+    formData.set(
+        'category',
+        input.category === null ? '' : String(input.category),
+    )
+    input.tags.forEach((tagId) => {
+        formData.append('tags', String(tagId))
+    })
+    formData.set('featured_image', input.featured_image!)
+    formData.set('featured_image_alt', input.featured_image_alt)
+    formData.set('post_type', input.post_type)
+    formData.set('allow_comments', String(input.allow_comments))
+    formData.set('meta_title', input.meta_title)
+    formData.set('meta_description', input.meta_description)
+
+    return formData
 }
 
 export interface PublicPostBlock {
@@ -207,11 +231,15 @@ export function getAuthorPost(
 export function createAuthorPost(
     input: AuthorPostInput,
 ): Promise<AuthorPostDetail> {
+    const body = input.featured_image
+        ? createAuthorPostFormData(input)
+        : JSON.stringify(input)
+
     return apiRequest<AuthorPostDetail>(
         '/api/dashboard/posts/',
         {
             method: 'POST',
-            body: JSON.stringify(input),
+            body,
         },
     )
 }
@@ -220,11 +248,15 @@ export function updateAuthorPost(
     postId: number,
     input: AuthorPostInput,
 ): Promise<AuthorPostDetail> {
+    const body = input.featured_image
+        ? createAuthorPostFormData(input)
+        : JSON.stringify(input)
+
     return apiRequest<AuthorPostDetail>(
         `/api/dashboard/posts/${postId}/`,
         {
             method: 'PUT',
-            body: JSON.stringify(input),
+            body,
         },
     )
 }

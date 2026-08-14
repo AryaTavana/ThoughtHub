@@ -93,6 +93,10 @@ describe('AppNavbar', () => {
       screen.getByRole('link', { name: 'ThoughtHub' }),
     ).toHaveAttribute('href', '/')
     expect(
+      screen.getByRole('link', { name: 'ThoughtHub' })
+        .querySelectorAll('.thought-hub-icon__image'),
+    ).toHaveLength(2)
+    expect(
       screen.getByRole('link', { name: 'Home' }),
     ).toHaveClass('active')
     expect(

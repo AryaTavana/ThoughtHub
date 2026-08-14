@@ -128,6 +128,8 @@ export function PostEditorPage() {
         useState<string | null>(null)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
+    const [featuredImageFile, setFeaturedImageFile] =
+        useState<File | null>(null)
 
     useEffect(() => {
         let isCancelled = false
@@ -156,6 +158,7 @@ export function PostEditorPage() {
                     setCategories(categoryChoices)
                     setTags(tagChoices)
                     setPost(existingPost)
+                    setFeaturedImageFile(null)
                     setFormData(
                         existingPost
                             ? toFormData(existingPost)
@@ -227,6 +230,20 @@ export function PostEditorPage() {
         clearFieldError('allow_comments')
     }
 
+    function handleFeaturedImageChange(
+        event: ChangeEvent<HTMLInputElement>,
+    ) {
+        const file = event.target.files?.[0] ?? null
+        setFeaturedImageFile(file)
+        clearFieldError('featured_image')
+
+        if (!file) {
+            return
+        }
+
+        setSubmitError(null)
+    }
+
     function handleTagChange(
         event: ChangeEvent<HTMLInputElement>,
     ) {
@@ -255,9 +272,15 @@ export function PostEditorPage() {
         const shouldPublish = submitter?.value === 'publish'
 
         try {
+            const submission = featuredImageFile
+                ? {
+                    ...formData,
+                    featured_image: featuredImageFile,
+                }
+                : formData
             const savedPost = isEditing
-                ? await updateAuthorPost(postId, formData)
-                : await createAuthorPost(formData)
+                ? await updateAuthorPost(postId, submission)
+                : await createAuthorPost(submission)
 
             if (shouldPublish) {
                 await publishAuthorPost(savedPost.id)
@@ -783,15 +806,60 @@ export function PostEditorPage() {
                             </div>
                         </div>
 
-                        {post?.featured_image && (
-                            <div className="card editor-panel editor-panel--image">
-                                <div className="card-body">
-                                    <div className="editor-panel__heading"><span><Icon icon={imageIcon} aria-hidden="true"/></span><div><p className="section-eyebrow">Visual context</p><h2>Featured image</h2><p>Describe the image so every reader receives its meaning.</p></div></div>
+                        <div className="card editor-panel editor-panel--image">
+                            <div className="card-body">
+                                <div className="editor-panel__heading"><span><Icon icon={imageIcon} aria-hidden="true"/></span><div><p className="section-eyebrow">Visual context</p><h2>Post banner</h2><p>Upload the image readers will see on post cards and above the article.</p></div></div>
+                                {post?.featured_image && !featuredImageFile && (
                                     <img
-                                        className="img-fluid rounded mb-3"
+                                        className="editor-featured-image-preview"
                                         src={post.featured_image}
                                         alt={formData.featured_image_alt}
                                     />
+                                )}
+                                <div className="mb-3">
+                                    <label
+                                        className="form-label"
+                                        htmlFor="post-featured-image"
+                                    >
+                                        Banner image
+                                    </label>
+                                    <input
+                                        id="post-featured-image"
+                                        className={`form-control ${
+                                            fieldErrors.featured_image
+                                                ? 'is-invalid'
+                                                : ''
+                                        }`}
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleFeaturedImageChange}
+                                        disabled={formIsDisabled}
+                                        aria-invalid={Boolean(
+                                            fieldErrors.featured_image,
+                                        )}
+                                        aria-describedby={
+                                            fieldErrors.featured_image
+                                                ? 'post-featured_image-error'
+                                                : 'post-featured-image-help'
+                                        }
+                                    />
+                                    <div
+                                        className="form-text"
+                                        id="post-featured-image-help"
+                                    >
+                                        A wide image works best. It will be cropped to fit post cards.
+                                    </div>
+                                    {featuredImageFile && (
+                                        <p className="editor-featured-image-selection">
+                                            Selected: {featuredImageFile.name}
+                                        </p>
+                                    )}
+                                    <FieldError
+                                        field="featured_image"
+                                        messages={fieldErrors.featured_image}
+                                    />
+                                </div>
+                                <div>
                                     <label
                                         className="form-label"
                                         htmlFor="post-featured-image-alt"
@@ -816,10 +884,18 @@ export function PostEditorPage() {
                                         aria-describedby={
                                             fieldErrors.featured_image_alt
                                                 ? 'post-featured_image_alt-error'
-                                                : undefined
+                                                : 'post-featured-image-alt-help'
                                         }
-                                        required
+                                        required={Boolean(
+                                            featuredImageFile || post?.featured_image,
+                                        )}
                                     />
+                                    <div
+                                        className="form-text"
+                                        id="post-featured-image-alt-help"
+                                    >
+                                        Briefly describe the image for readers who cannot see it.
+                                    </div>
                                     <FieldError
                                         field="featured_image_alt"
                                         messages={
@@ -828,7 +904,7 @@ export function PostEditorPage() {
                                     />
                                 </div>
                             </div>
-                        )}
+                        </div>
 
                         <div className="editor-actions">
                             <div><strong>{isEditing ? 'Save this revision' : 'Ready to begin?'}</strong><span>You can return and edit your work at any time.</span></div>

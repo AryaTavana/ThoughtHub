@@ -17,6 +17,7 @@ import {
     type PublicPostListItem,
 } from '../api/posts'
 import {SavedPostButton} from '../components/SavedPostButton'
+import {ThoughtHubIcon} from '../components/ThoughtHubIcon'
 
 const publishedDateFormatter = new Intl.DateTimeFormat(undefined, {
     dateStyle: 'medium',
@@ -130,7 +131,10 @@ export function PublicPostsPage() {
                         <div className="idea-orbit idea-orbit--one"><Icon icon={sparklesIcon}/><span>Ideas</span></div>
                         <div className="idea-orbit idea-orbit--two"><Icon icon={heartIcon}/><span>Perspectives</span></div>
                         <div className="idea-orbit idea-orbit--three"><Icon icon={flameIcon}/><span>Campus stories</span></div>
-                        <div className="idea-core"><span>T</span><small>Your voice belongs here</small></div>
+                        <div className="idea-core">
+                            <ThoughtHubIcon className="idea-core__mark"/>
+                            <small>Your voice belongs here</small>
+                        </div>
                     </div>
                 </header>
             </div>
@@ -198,7 +202,9 @@ export function PublicPostsPage() {
                                             </div>
                                             <h3><Link to={`/posts/${post.slug}`}>{post.title}</Link></h3>
                                             {post.excerpt && <p>{post.excerpt}</p>}
-                                            {post.tags.length > 0 && <div className="post-tags">{post.tags.map((tag) => <span key={tag.id}>#{tag.name}</span>)}</div>}
+                                            <div className="post-card__tag-slot">
+                                                {post.tags.length > 0 && <div className="post-tags">{post.tags.map((tag) => <span key={tag.id}>#{tag.name}</span>)}</div>}
+                                            </div>
                                             <div className="post-card__meta">
                                                 <span>By {post.author_username ?? 'Deleted user'}</span>
                                                 <span><time dateTime={post.published_at}>{formatPublishedDate(post.published_at)}</time> · {post.reading_time} min read</span>

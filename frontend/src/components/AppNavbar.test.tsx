@@ -107,6 +107,9 @@ describe('AppNavbar', () => {
       screen.getByRole('link', { name: 'Create account' }),
     ).toHaveAttribute('href', '/register')
     expect(
+      screen.getByRole('link', { name: 'Categories' }),
+    ).toHaveAttribute('href', '/categories')
+    expect(
       screen.queryByRole('link', { name: 'Dashboard' }),
     ).not.toBeInTheDocument()
     expect(
@@ -119,7 +122,7 @@ describe('AppNavbar', () => {
     renderNavbar()
 
     const searchbox = screen.getByRole('searchbox', {
-      name: 'Search published posts by title, author, or topic',
+      name: 'Search published posts by title, author, category, or tag',
     })
     await user.type(searchbox, 'Django')
 
@@ -157,7 +160,8 @@ describe('AppNavbar', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('shows private navigation and the first name when authenticated', () => {
+  it('places profile actions and logout inside the account menu', async () => {
+    const user = userEvent.setup()
     renderNavbar('/dashboard', {
       user: currentUser,
       isAuthenticated: true,
@@ -174,7 +178,27 @@ describe('AppNavbar', () => {
     ).toHaveAttribute('href', '/notifications')
     expect(screen.getByText('Arya')).toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: 'Log out' }),
+      screen.queryByRole('button', { name: 'Log out' }),
+    ).not.toBeInTheDocument()
+
+    const profileButton = screen.getByRole('button', {
+      name: "Open Arya's profile menu",
+    })
+    expect(profileButton).toHaveAttribute('aria-expanded', 'false')
+    await user.click(profileButton)
+
+    expect(profileButton).toHaveAttribute('aria-expanded', 'true')
+    const profileMenu = screen.getByRole('navigation', {
+      name: 'Profile menu',
+    })
+    expect(
+      within(profileMenu).getByRole('link', { name: 'View profile' }),
+    ).toHaveAttribute('href', '/profile/arya')
+    expect(
+      within(profileMenu).getByRole('link', { name: 'Settings' }),
+    ).toHaveAttribute('href', '/settings')
+    expect(
+      within(profileMenu).getByRole('button', { name: 'Log out' }),
     ).toBeEnabled()
     expect(
       screen.queryByRole('link', { name: 'Log in' }),
@@ -193,6 +217,62 @@ describe('AppNavbar', () => {
     expect(screen.getByText('arya')).toBeInTheDocument()
   })
 
+  it('closes the profile menu without interrupting another navigation control', async () => {
+    const user = userEvent.setup()
+    renderNavbar('/dashboard', {
+      user: currentUser,
+      isAuthenticated: true,
+    })
+
+    await user.click(
+      screen.getByRole('button', {
+        name: "Open Arya's profile menu",
+      }),
+    )
+    expect(
+      screen.getByRole('navigation', { name: 'Profile menu' }),
+    ).toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole('button', { name: 'Open navigation' }),
+    )
+
+    expect(
+      screen.queryByRole('navigation', { name: 'Profile menu' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Close navigation' }),
+    ).toBeInTheDocument()
+  })
+
+  it('exposes the backend moderation workspace to staff only', () => {
+    const {rerender} = renderNavbar('/dashboard', {
+      user: currentUser,
+      isAuthenticated: true,
+    })
+
+    expect(
+      screen.queryByRole('link', {name: 'Moderation'}),
+    ).not.toBeInTheDocument()
+
+    rerender(
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <AuthContext.Provider value={{
+          ...signedOutAuth,
+          user: {...currentUser, is_staff: true},
+          isAuthenticated: true,
+        }}>
+          <AppNavbar />
+          <CurrentPath />
+        </AuthContext.Provider>
+      </MemoryRouter>,
+    )
+
+    expect(
+      screen.getByRole('link', {name: 'Moderation'}),
+    ).toHaveAttribute('href', '/moderation')
+  })
+
   it('disables logout while pending and navigates home after success', async () => {
     let resolveLogout: () => void = () => {}
     logoutMock.mockReturnValue(
@@ -206,6 +286,11 @@ describe('AppNavbar', () => {
       isAuthenticated: true,
     })
 
+    await user.click(
+      screen.getByRole('button', {
+        name: "Open Arya's profile menu",
+      }),
+    )
     await user.click(
       screen.getByRole('button', { name: 'Log out' }),
     )
@@ -237,6 +322,11 @@ describe('AppNavbar', () => {
       isAuthenticated: true,
     })
 
+    await user.click(
+      screen.getByRole('button', {
+        name: "Open Arya's profile menu",
+      }),
+    )
     await user.click(
       screen.getByRole('button', { name: 'Log out' }),
     )

@@ -115,14 +115,15 @@ class PublicUserProfileView(APIView):
         user.total_reading_time = sum(
             post.reading_time for post in published_posts
         )
-        user.topics_count = len({
-            topic
+        user.categories_count = len({
+            post.category_id
             for post in published_posts
-            for topic in (
-                *((f'category:{post.category.slug}',) if post.category else ()),
-                f'type:{post.post_type}',
-                *(f'tag:{tag.slug}' for tag in post.tags.all()),
-            )
+            if post.category_id is not None
+        })
+        user.tags_count = len({
+            tag.id
+            for post in published_posts
+            for tag in post.tags.all()
         })
 
         return Response(PublicUserProfileSerializer(user).data)

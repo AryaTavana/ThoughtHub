@@ -132,6 +132,25 @@ describe('application routes', () => {
     )
   })
 
+  it('routes backend classifications through categories and tags', async () => {
+    renderRoute('/categories')
+
+    expect(await screen.findByRole('heading', {
+      name: 'Categories and tags',
+    })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Loading categories and tags…',
+    )
+  })
+
+  it('removes the unsupported topics route', () => {
+    renderRoute('/topics')
+
+    expect(
+      screen.getByRole('heading', {name: 'Page not found'}),
+    ).toBeInTheDocument()
+  })
+
   it('redirects a signed-out dashboard visitor to login', () => {
     renderRoute('/dashboard')
 
@@ -155,6 +174,31 @@ describe('application routes', () => {
     expect(
       screen.getByText('Loading your posts…'),
     ).toBeInTheDocument()
+  })
+
+  it('keeps moderation hidden from regular users', async () => {
+    renderRoute('/moderation', {
+      user: currentUser,
+      isAuthenticated: true,
+    })
+
+    expect(
+      await screen.findByRole('heading', {name: 'Your posts'}),
+    ).toBeInTheDocument()
+  })
+
+  it('connects staff users to the backend moderation workspace', async () => {
+    renderRoute('/moderation', {
+      user: {...currentUser, is_staff: true},
+      isAuthenticated: true,
+    })
+
+    expect(
+      await screen.findByRole('heading', {name: 'Moderation'}),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', {name: 'Open administrator workspace'}),
+    ).toHaveAttribute('href', '/admin/')
   })
 
   it.each([

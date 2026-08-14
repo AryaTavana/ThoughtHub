@@ -154,7 +154,8 @@ class CurrentUserUpdateSerializer(serializers.ModelSerializer):
 class PublicUserProfileSerializer(serializers.ModelSerializer):
     published_posts_count = serializers.IntegerField(read_only=True)
     total_reading_time = serializers.IntegerField(read_only=True)
-    topics_count = serializers.IntegerField(read_only=True)
+    categories_count = serializers.IntegerField(read_only=True)
+    tags_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = User
@@ -164,7 +165,8 @@ class PublicUserProfileSerializer(serializers.ModelSerializer):
             'last_name',
             'published_posts_count',
             'total_reading_time',
-            'topics_count',
+            'categories_count',
+            'tags_count',
         )
         read_only_fields = fields
 

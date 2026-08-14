@@ -119,7 +119,6 @@ class PostAdmin(ModelAdmin):
         'date_posted',
         'updated_at',
         'views',
-        'likes',
         'comments',
     )
     prepopulated_fields = {'slug': ('title',)}
@@ -171,7 +170,6 @@ class PostAdmin(ModelAdmin):
                 'classes': ('collapse',),
                 'fields': (
                     'views',
-                    'likes',
                     'comments',
                     'date_posted',
                     'updated_at',

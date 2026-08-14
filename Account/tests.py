@@ -594,7 +594,8 @@ class PublicUserProfileAPITests(APITestCase):
         self.assertEqual(response.data['last_name'], 'Author')
         self.assertEqual(response.data['published_posts_count'], 1)
         self.assertEqual(response.data['total_reading_time'], 1)
-        self.assertEqual(response.data['topics_count'], 3)
+        self.assertEqual(response.data['categories_count'], 1)
+        self.assertEqual(response.data['tags_count'], 1)
         self.assertNotIn('email', response.data)
 
     def test_unknown_or_inactive_profile_returns_not_found(self):

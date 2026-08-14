@@ -76,18 +76,20 @@ class PublicPostListView(ListAPIView):
         if author:
             queryset = queryset.filter(author__username=author)
 
-        topic = self.request.query_params.get('topic', '').strip()
-        if topic:
-            queryset = queryset.filter(
-                Q(category__slug__iexact=topic)
-                | Q(tags__slug__iexact=topic)
-                | Q(post_type__iexact=topic)
-            ).distinct()
+        category = self.request.query_params.get('category', '').strip()
+        if category:
+            queryset = queryset.filter(category__slug__iexact=category)
+
+        tag = self.request.query_params.get('tag', '').strip()
+        if tag:
+            queryset = queryset.filter(tags__slug__iexact=tag).distinct()
+
+        post_type = self.request.query_params.get('post_type', '').strip()
+        if post_type:
+            queryset = queryset.filter(post_type__iexact=post_type)
 
         ordering = self.request.query_params.get('ordering', 'newest')
-        if ordering == 'liked':
-            queryset = queryset.order_by('-likes', '-published_at', '-pk')
-        elif ordering == 'viewed':
+        if ordering == 'viewed':
             queryset = queryset.order_by('-views', '-published_at', '-pk')
         else:
             queryset = queryset.order_by('-published_at', '-date_posted')
@@ -162,6 +164,7 @@ class PublicPostDetailView(RetrieveAPIView):
     def retrieve(self, request, *args, **kwargs):
         post = self.get_object()
         Post.objects.filter(pk=post.pk).update(views=F('views') + 1)
+        post.refresh_from_db(fields=('views',))
         return Response(self.get_serializer(post).data)
 
 

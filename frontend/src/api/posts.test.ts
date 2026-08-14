@@ -60,6 +60,7 @@ const publishedPost: PublicPostListItem = {
     id: 3,
     name: 'Programming',
     slug: 'programming',
+    description: 'Software development and programming.',
   },
   tags: [
     {
@@ -76,8 +77,11 @@ const publishedPost: PublicPostListItem = {
   featured_image: 'http://localhost:8000/media/posts/guide.jpg',
   featured_image_alt: 'Django and React logos',
   post_type: 'tutorial',
+  is_featured: true,
   published_at: '2026-07-30T08:45:00Z',
   reading_time: 6,
+  views: 24,
+  comments: 3,
 }
 
 const firstPage: PaginatedResponse<PublicPostListItem> = {
@@ -249,12 +253,14 @@ describe('published posts API service', () => {
       page: 2,
       search: '  Django API  ',
       author: '  arya  ',
-      topic: 'rest-api',
+      category: 'development',
+      tag: 'rest-api',
+      postType: 'tutorial',
       ordering: 'viewed',
     })
 
     expect(apiRequestMock).toHaveBeenCalledWith(
-      '/api/posts/?page=2&search=Django+API&author=arya&topic=rest-api&ordering=viewed',
+      '/api/posts/?page=2&search=Django+API&author=arya&category=development&tag=rest-api&post_type=tutorial&ordering=viewed',
     )
   })
 
@@ -275,6 +281,9 @@ describe('published posts API service', () => {
       ],
       post_type: 'tutorial',
       reading_time: 6,
+      is_featured: true,
+      views: 24,
+      comments: 3,
     })
   })
 

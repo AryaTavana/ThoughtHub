@@ -61,6 +61,7 @@ const publishedPost: PublicPostDetail = {
     id: 3,
     name: 'Programming',
     slug: 'programming',
+    description: 'Programming tutorials and projects.',
   },
   tags: [
     {
@@ -77,8 +78,11 @@ const publishedPost: PublicPostDetail = {
   featured_image: '/media/posts/guide.jpg',
   featured_image_alt: 'Django and React logos',
   post_type: 'tutorial',
+  is_featured: true,
   published_at: '2026-07-30T08:45:00Z',
   reading_time: 7,
+  views: 25,
+  comments: 4,
   content: 'A safe introduction to the article.',
   blocks: [
     {
@@ -171,11 +175,19 @@ describe('PublicPostDetailPage', () => {
     expect(
       screen.getByText('A safe introduction to the article.'),
     ).toBeInTheDocument()
-    expect(screen.getByText('Programming')).toBeInTheDocument()
-    expect(screen.getByText('#Django')).toBeInTheDocument()
+    expect(screen.getByRole('link', {name: 'Programming'})).toHaveAttribute(
+      'href',
+      '/categories/programming',
+    )
+    expect(screen.getByRole('link', {name: '#Django'})).toHaveAttribute(
+      'href',
+      '/tags/django',
+    )
     expect(screen.getByText('#React')).toBeInTheDocument()
     expect(screen.getByText('By arya')).toBeInTheDocument()
     expect(screen.getByText('7 min read')).toBeInTheDocument()
+    expect(screen.getByText('25 views')).toBeInTheDocument()
+    expect(screen.getByText('4 comments')).toBeInTheDocument()
     expect(
       screen.getByRole('img', {
         name: 'Django and React logos',

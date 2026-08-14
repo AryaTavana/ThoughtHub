@@ -436,6 +436,7 @@ class TaxonomyListAPITests(APITestCase):
         cls.backend_category = Category.objects.create(
             name='Backend',
             slug='backend',
+            description='Server-side development.',
         )
         cls.design_category = Category.objects.create(
             name='Design',
@@ -464,11 +465,13 @@ class TaxonomyListAPITests(APITestCase):
                     'id': self.backend_category.pk,
                     'name': 'Backend',
                     'slug': 'backend',
+                    'description': 'Server-side development.',
                 },
                 {
                     'id': self.design_category.pk,
                     'name': 'Design',
                     'slug': 'design',
+                    'description': '',
                 },
             ],
         )
@@ -588,7 +591,7 @@ class PublicPostListAPITests(APITestCase):
             status.HTTP_405_METHOD_NOT_ALLOWED,
         )
 
-    def test_list_filters_by_exact_author_and_topic(self):
+    def test_list_filters_by_exact_author_category_tag_and_type(self):
         user_model = get_user_model()
         author = user_model.objects.create_user(username='filter-author')
         other_author = user_model.objects.create_user(username='other-author')
@@ -598,6 +601,7 @@ class PublicPostListAPITests(APITestCase):
             title='Matching post',
             author=author,
             category=category,
+            post_type=Post.PostType.TUTORIAL,
             status=Post.Status.PUBLISHED,
         )
         matching_post.tags.add(tag)
@@ -608,11 +612,17 @@ class PublicPostListAPITests(APITestCase):
         )
 
         author_response = self.client.get(self.url, {'author': author.username})
-        category_response = self.client.get(self.url, {'topic': 'engineering'})
-        tag_response = self.client.get(self.url, {'topic': 'PYTHON'})
-        missing_response = self.client.get(self.url, {'topic': 'missing'})
+        category_response = self.client.get(self.url, {'category': 'engineering'})
+        tag_response = self.client.get(self.url, {'tag': 'PYTHON'})
+        type_response = self.client.get(self.url, {'post_type': 'tutorial'})
+        missing_response = self.client.get(self.url, {'category': 'missing'})
 
-        for response in (author_response, category_response, tag_response):
+        for response in (
+            author_response,
+            category_response,
+            tag_response,
+            type_response,
+        ):
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             self.assertEqual(response.data['count'], 1)
             self.assertEqual(
@@ -621,25 +631,25 @@ class PublicPostListAPITests(APITestCase):
             )
         self.assertEqual(missing_response.data['count'], 0)
 
-    def test_list_orders_across_the_queryset_by_real_counters(self):
-        self.public_post.likes = 2
+    def test_list_orders_across_the_queryset_by_view_count(self):
         self.public_post.views = 4
-        self.public_post.save(update_fields=('likes', 'views'))
-        self.second_public_post.likes = 8
+        self.public_post.is_featured = True
+        self.public_post.comments = 3
+        self.public_post.save(
+            update_fields=('views', 'is_featured', 'comments'),
+        )
         self.second_public_post.views = 1
-        self.second_public_post.save(update_fields=('likes', 'views'))
+        self.second_public_post.save(update_fields=('views',))
 
-        liked_response = self.client.get(self.url, {'ordering': 'liked'})
         viewed_response = self.client.get(self.url, {'ordering': 'viewed'})
 
-        self.assertEqual(
-            liked_response.data['results'][0]['slug'],
-            self.second_public_post.slug,
-        )
         self.assertEqual(
             viewed_response.data['results'][0]['slug'],
             self.public_post.slug,
         )
+        self.assertTrue(viewed_response.data['results'][0]['is_featured'])
+        self.assertEqual(viewed_response.data['results'][0]['views'], 4)
+        self.assertEqual(viewed_response.data['results'][0]['comments'], 3)
 
 
 class PublicPostDetailAPITests(APITestCase):
@@ -674,6 +684,7 @@ class PublicPostDetailAPITests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['slug'], self.public_post.slug)
+        self.assertEqual(response.data['views'], 1)
         self.assertEqual(
             response.data['content'],
             'Public introduction',

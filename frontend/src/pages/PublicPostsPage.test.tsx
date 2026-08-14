@@ -40,6 +40,7 @@ const firstPost: PublicPostListItem = {
     id: 3,
     name: 'Programming',
     slug: 'programming',
+    description: 'Programming tutorials and projects.',
   },
   tags: [
     {
@@ -56,8 +57,11 @@ const firstPost: PublicPostListItem = {
   featured_image: '/media/posts/guide.jpg',
   featured_image_alt: 'Django and React logos',
   post_type: 'tutorial',
+  is_featured: true,
   published_at: '2026-07-30T08:45:00Z',
   reading_time: 6,
+  views: 24,
+  comments: 3,
 }
 
 const firstPage: PaginatedResponse<PublicPostListItem> = {
@@ -152,15 +156,28 @@ describe('PublicPostsPage', () => {
       '/posts/learning-django-and-react',
     )
     expect(
+      screen.getByRole('link', {name: 'Learning Django and React'})
+        .closest('article'),
+    ).toHaveClass('post-card--featured')
+    expect(
       screen.getByRole('img', {
         name: 'Django and React logos',
       }),
     ).toHaveAttribute('src', '/media/posts/guide.jpg')
-    expect(screen.getByText('Programming')).toBeInTheDocument()
-    expect(screen.getByText('#Django')).toBeInTheDocument()
-    expect(screen.getByText('#React')).toBeInTheDocument()
+    expect(screen.getAllByText('Programming').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('#Django').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('#React').length).toBeGreaterThan(0)
     expect(screen.getByText('By arya')).toBeInTheDocument()
     expect(screen.getByText(/6 min read/)).toBeInTheDocument()
+    expect(screen.getByText('24 views · 3 comments')).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('link', {name: 'Programming'})
+        .some((link) => link.getAttribute('href') === '/categories/programming'),
+    ).toBe(true)
+    expect(
+      screen.getAllByRole('link', {name: '#Django'})
+        .some((link) => link.getAttribute('href') === '/tags/django'),
+    ).toBe(true)
     expect(
       screen.getByRole('button', {
         name: 'Save Learning Django and React',
@@ -190,8 +207,10 @@ describe('PublicPostsPage', () => {
 
     renderPostsPage()
 
-    const tag = await screen.findByText('#Django')
-    expect(tag.closest('.post-card__tag-slot')).not.toBeNull()
+    const tags = await screen.findAllByText('#Django')
+    expect(
+      tags.some((tag) => tag.closest('.post-card__tag-slot') !== null),
+    ).toBe(true)
   })
 
   it('renders an empty state when no posts are published', async () => {

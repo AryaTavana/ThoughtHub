@@ -48,8 +48,9 @@ import {
   PublicProfilePage,
   SavedPostsPage,
   SearchPage,
-  TopicPage,
-  TopicsIndexPage,
+  CategoriesTagsPage,
+  CategoryPage,
+  TagPage,
 } from './CommunityPages'
 
 vi.mock('../api/posts', () => ({
@@ -87,13 +88,17 @@ const djangoPost: PublicPostListItem = {
     id: 1,
     name: 'Development',
     slug: 'development',
+    description: 'Software projects and engineering.',
   },
   tags: [],
   featured_image: null,
   featured_image_alt: '',
   post_type: 'tutorial',
+  is_featured: false,
   published_at: '2026-08-13T08:00:00Z',
   reading_time: 4,
+  views: 8,
+  comments: 2,
 }
 
 const reactPost: PublicPostListItem = {
@@ -153,7 +158,7 @@ describe('live community features', () => {
 
     await user.type(
       screen.getByRole('searchbox', {
-        name: 'Search published posts by title, author, or topic',
+        name: 'Search published posts by title, author, category, or tag',
       }),
       'Django',
     )
@@ -273,47 +278,83 @@ describe('live community features', () => {
     })
   })
 
-  it('loads topic matches from the backend without unrelated fallbacks', async () => {
+  it('loads category matches using the exact backend category filter', async () => {
     getPublishedPostsMock.mockResolvedValue(page([]))
+    getCategoriesMock.mockResolvedValue([
+      {
+        id: 1,
+        name: 'Missing category',
+        slug: 'missing-category',
+        description: '',
+      },
+    ])
 
     render(
-      <MemoryRouter initialEntries={['/topics/missing-topic']}>
+      <MemoryRouter initialEntries={['/categories/missing-category']}>
         <Routes>
-          <Route path="/topics/:topic" element={<TopicPage />} />
+          <Route path="/categories/:category" element={<CategoryPage />} />
         </Routes>
       </MemoryRouter>,
     )
 
     expect(
-      await screen.findByRole('heading', {name: 'No posts in this topic'}),
+      await screen.findByRole('heading', {name: 'No posts in this category'}),
     ).toBeInTheDocument()
     expect(getPublishedPostsMock).toHaveBeenCalledWith({
       page: 1,
-      topic: 'missing-topic',
+      category: 'missing-category',
     })
     expect(
       screen.queryByRole('link', {name: 'Learning Django'}),
     ).not.toBeInTheDocument()
   })
 
-  it('lists every category and tag in the topic directory', async () => {
+  it('lists backend categories and tags on their distinct routes', async () => {
     getCategoriesMock.mockResolvedValue([
-      {id: 1, name: 'Development', slug: 'development'},
+      {
+        id: 1,
+        name: 'Development',
+        slug: 'development',
+        description: 'Software projects and engineering.',
+      },
     ])
     getTagsMock.mockResolvedValue([
       {id: 2, name: 'Testing', slug: 'testing'},
     ])
 
-    render(<MemoryRouter><TopicsIndexPage /></MemoryRouter>)
+    render(<MemoryRouter><CategoriesTagsPage /></MemoryRouter>)
 
     expect(
       await screen.findByRole('link', {name: /Development/}),
-    ).toHaveAttribute('href', '/topics/development')
+    ).toHaveAttribute('href', '/categories/development')
     expect(
       screen.getByRole('link', {name: /#Testing/}),
-    ).toHaveAttribute('href', '/topics/testing')
+    ).toHaveAttribute('href', '/tags/testing')
     expect(getCategoriesMock).toHaveBeenCalledOnce()
     expect(getTagsMock).toHaveBeenCalledOnce()
+  })
+
+  it('loads tag matches using the exact backend tag filter', async () => {
+    getPublishedPostsMock.mockResolvedValue(page([djangoPost]))
+    getTagsMock.mockResolvedValue([
+      {id: 2, name: 'Testing', slug: 'testing'},
+    ])
+
+    render(
+      <MemoryRouter initialEntries={['/tags/testing']}>
+        <Routes>
+          <Route path="/tags/:tag" element={<TagPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(
+      await screen.findByRole('heading', {name: 'Testing'}),
+    ).toBeInTheDocument()
+    expect(getPublishedPostsMock).toHaveBeenCalledWith({
+      page: 1,
+      tag: 'testing',
+    })
   })
 
   it('requests a real one-use password reset link', async () => {

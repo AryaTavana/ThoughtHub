@@ -35,7 +35,8 @@ export interface PublicUserProfile {
     last_name: string
     published_posts_count: number
     total_reading_time: number
-    topics_count: number
+    categories_count: number
+    tags_count: number
 }
 
 export interface PasswordResetConfirmation {

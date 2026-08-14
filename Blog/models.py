@@ -139,7 +139,6 @@ class Post(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     views = models.PositiveBigIntegerField(default=0, editable=False)
-    likes = models.PositiveIntegerField(default=0, editable=False)
     comments = models.PositiveIntegerField(default=0, editable=False)
 
     objects = PublishedPostQuerySet.as_manager()

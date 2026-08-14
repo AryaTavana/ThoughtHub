@@ -49,6 +49,7 @@ const publishedPost: AuthorPostListItem = {
     id: 3,
     name: 'Development',
     slug: 'development',
+    description: 'Software development.',
   },
   tags: [
     {
@@ -60,8 +61,11 @@ const publishedPost: AuthorPostListItem = {
   featured_image: '/media/posts/architecture.jpg',
   featured_image_alt: 'Application architecture diagram',
   post_type: 'tutorial',
+  is_featured: false,
   published_at: '2026-07-28T08:45:00Z',
   reading_time: 6,
+  views: 12,
+  comments: 2,
   status: 'published',
   review_feedback: '',
   date_posted: '2026-07-27T08:45:00Z',

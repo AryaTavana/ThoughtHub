@@ -80,7 +80,8 @@ describe('authentication API service', () => {
       last_name: 'Tavana',
       published_posts_count: 2,
       total_reading_time: 8,
-      topics_count: 3,
+      categories_count: 2,
+      tags_count: 3,
     }
     apiRequestMock.mockResolvedValue(profile)
 

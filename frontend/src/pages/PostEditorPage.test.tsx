@@ -54,8 +54,8 @@ const publishAuthorPostMock = vi.mocked(publishAuthorPost)
 const updateAuthorPostMock = vi.mocked(updateAuthorPost)
 
 const categories: Category[] = [
-  { id: 3, name: 'Development', slug: 'development' },
-  { id: 4, name: 'Design', slug: 'design' },
+  { id: 3, name: 'Development', slug: 'development', description: 'Software development.' },
+  { id: 4, name: 'Design', slug: 'design', description: 'Design practice.' },
 ]
 
 const tags: Tag[] = [

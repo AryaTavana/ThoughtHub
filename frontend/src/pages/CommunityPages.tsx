@@ -15,6 +15,7 @@ import messageIcon from '@iconify-icons/lucide/message-circle'
 import penLineIcon from '@iconify-icons/lucide/pen-line'
 import searchIcon from '@iconify-icons/lucide/search'
 import shieldCheckIcon from '@iconify-icons/lucide/shield-check'
+import tagIcon from '@iconify-icons/lucide/tag'
 import userIcon from '@iconify-icons/lucide/user'
 import usersIcon from '@iconify-icons/lucide/users'
 import wifiOffIcon from '@iconify-icons/lucide/wifi-off'
@@ -68,7 +69,16 @@ function PostRows({posts}: {posts: PublicPostListItem[]}) {
                 <article className="post-row" key={post.id}>
                     <div className="post-row__content">
                         <div className="post-row__topline">
-                            <span className="content-label">{post.category?.name ?? post.post_type}</span>
+                            {post.category ? (
+                                <Link
+                                    className="content-label"
+                                    to={`/categories/${post.category.slug}`}
+                                >
+                                    {post.category.name}
+                                </Link>
+                            ) : (
+                                <span className="content-label">{post.post_type}</span>
+                            )}
                             <SavedPostButton
                                 post={{
                                     slug: post.slug,
@@ -184,7 +194,8 @@ export function PublicProfilePage() {
             <div className="profile-stats" aria-label="Profile activity">
                 <div><strong>{profile.published_posts_count}</strong><span>Posts</span></div>
                 <div><strong>{profile.total_reading_time}</strong><span>Minutes of reading</span></div>
-                <div><strong>{profile.topics_count}</strong><span>Topics</span></div>
+                <div><strong>{profile.categories_count}</strong><span>Categories</span></div>
+                <div><strong>{profile.tags_count}</strong><span>Tags</span></div>
             </div>
 
             <div className="section-heading"><div><p className="section-eyebrow">Latest writing</p><h2>Posts by {displayName}</h2></div></div>
@@ -195,50 +206,79 @@ export function PublicProfilePage() {
     )
 }
 
-export function TopicPage() {
-    const {topic = 'technology'} = useParams<{topic: string}>()
+type ClassificationKind = 'category' | 'tag'
+
+function ClassificationPage({kind}: {kind: ClassificationKind}) {
+    const parameters = useParams<{category?: string; tag?: string}>()
+    const slug = parameters[kind] ?? ''
     const [postsPage, setPostsPage] = useState<Awaited<ReturnType<typeof getPublishedPosts>> | null>(null)
-    const [pageState, setPageState] = useState({topic, page: 1})
+    const [classification, setClassification] = useState<Category | Tag | null>(null)
+    const [pageState, setPageState] = useState({slug, page: 1})
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
-    const label = topic.replace(/-/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase())
-    const page = pageState.topic === topic ? pageState.page : 1
+    const page = pageState.slug === slug ? pageState.page : 1
+    const label = classification?.name ?? slug
+        .replace(/-/g, ' ')
+        .replace(/\b\w/g, (character) => character.toUpperCase())
+    const kindLabel = kind === 'category' ? 'Category' : 'Tag'
 
     useEffect(() => {
         let cancelled = false
 
-        async function loadTopic() {
+        async function loadClassification() {
             setIsLoading(true)
             setError(null)
             setPostsPage(null)
+            setClassification(null)
             try {
-                const response = await getPublishedPosts({page, topic})
-                if (!cancelled) setPostsPage(response)
+                const [postsResponse, choices] = await Promise.all([
+                    getPublishedPosts({
+                        page,
+                        ...(kind === 'category'
+                            ? {category: slug}
+                            : {tag: slug}),
+                    }),
+                    kind === 'category' ? getCategories() : getTags(),
+                ])
+                if (!cancelled) {
+                    setPostsPage(postsResponse)
+                    setClassification(
+                        choices.find((choice) => choice.slug === slug) ?? null,
+                    )
+                }
             } catch (loadError) {
-                if (!cancelled) setError(getApiErrorMessage(loadError, 'Unable to load this topic.'))
+                if (!cancelled) setError(getApiErrorMessage(loadError, `Unable to load this ${kind}.`))
             } finally {
                 if (!cancelled) setIsLoading(false)
             }
         }
 
-        void loadTopic()
+        void loadClassification()
         return () => { cancelled = true }
-    }, [page, topic])
+    }, [kind, page, slug])
 
     return (
-        <section className="app-shell community-page topic-page">
-            <header className="topic-hero">
-                <div className="topic-hero__icon"><Icon icon={cpuIcon} aria-hidden="true"/></div>
-                <div><p className="section-eyebrow">Topic</p><h1>{label}</h1><p>Ideas, tutorials, projects, and honest lessons from students learning together.</p><div className="topic-hero__meta"><span>{postsPage?.count ?? 0} matching posts</span><span>Updated with the latest writing</span></div></div>
+        <section className="app-shell community-page classification-page">
+            <header className="classification-hero">
+                <div className="classification-hero__icon"><Icon icon={kind === 'category' ? cpuIcon : tagIcon} aria-hidden="true"/></div>
+                <div><p className="section-eyebrow">{kindLabel}</p><h1>{label}</h1><p>{kind === 'category' && classification && 'description' in classification && classification.description ? classification.description : `Published posts filed under this ${kind}.`}</p><div className="classification-hero__meta"><span>{postsPage?.count ?? 0} matching posts</span><span>Updated with the latest writing</span></div></div>
             </header>
-            <div className="content-toolbar"><p>Newest matching posts</p><Link to={`/search?q=${encodeURIComponent(label)}`} className="quiet-link"><Icon icon={searchIcon} aria-hidden="true"/> Search this topic</Link></div>
-            {isLoading && !postsPage ? <LoadingState label="Loading topic posts…"/> : error ? <div className="app-alert app-alert--danger" role="alert">{error}</div> : postsPage && postsPage.results.length > 0 ? <><PostRows posts={postsPage.results}/>{(postsPage.previous || postsPage.next) && <nav className="pagination-bar" aria-label="Topic post pages"><button className="button button--secondary" type="button" disabled={!postsPage.previous} onClick={() => setPageState({topic, page: Math.max(1, page - 1)})}>Previous</button><span>Page {page}</span><button className="button button--secondary" type="button" disabled={!postsPage.next} onClick={() => setPageState({topic, page: page + 1})}>Next</button></nav>}</> : <div className="empty-state"><Icon icon={searchIcon} aria-hidden="true"/><h2>No posts in this topic</h2><p>Try another topic or search all published writing.</p><Link className="button button--secondary" to="/search">Search ThoughtHub</Link></div>}
+            <div className="content-toolbar"><p>Newest matching posts</p><Link to="/categories" className="quiet-link"><Icon icon={arrowLeftIcon} aria-hidden="true"/> All categories and tags</Link></div>
+            {isLoading && !postsPage ? <LoadingState label={`Loading ${kind} posts…`}/> : error ? <div className="app-alert app-alert--danger" role="alert">{error}</div> : !classification ? <div className="empty-state"><Icon icon={searchIcon} aria-hidden="true"/><h2>{kindLabel} not found</h2><p>This {kind} does not exist in the backend catalogue.</p><Link className="button button--secondary" to="/categories">Browse categories and tags</Link></div> : postsPage && postsPage.results.length > 0 ? <><PostRows posts={postsPage.results}/>{(postsPage.previous || postsPage.next) && <nav className="pagination-bar" aria-label={`${kindLabel} post pages`}><button className="button button--secondary" type="button" disabled={!postsPage.previous} onClick={() => setPageState({slug, page: Math.max(1, page - 1)})}>Previous</button><span>Page {page}</span><button className="button button--secondary" type="button" disabled={!postsPage.next} onClick={() => setPageState({slug, page: page + 1})}>Next</button></nav>}</> : <div className="empty-state"><Icon icon={searchIcon} aria-hidden="true"/><h2>No posts in this {kind}</h2><p>Browse another category or tag, or search all published writing.</p><Link className="button button--secondary" to="/search">Search ThoughtHub</Link></div>}
         </section>
     )
 }
 
-export function TopicsIndexPage() {
-    const [topics, setTopics] = useState<{
+export function CategoryPage() {
+    return <ClassificationPage kind="category"/>
+}
+
+export function TagPage() {
+    return <ClassificationPage kind="tag"/>
+}
+
+export function CategoriesTagsPage() {
+    const [classifications, setClassifications] = useState<{
         categories: Category[]
         tags: Tag[]
     } | null>(null)
@@ -247,33 +287,33 @@ export function TopicsIndexPage() {
     useEffect(() => {
         let cancelled = false
 
-        async function loadTopics() {
+        async function loadClassifications() {
             setError(null)
             try {
                 const [categories, tags] = await Promise.all([
                     getCategories(),
                     getTags(),
                 ])
-                if (!cancelled) setTopics({categories, tags})
+                if (!cancelled) setClassifications({categories, tags})
             } catch (loadError) {
                 if (!cancelled) {
-                    setError(getApiErrorMessage(loadError, 'Unable to load topics.'))
+                    setError(getApiErrorMessage(loadError, 'Unable to load categories and tags.'))
                 }
             }
         }
 
-        void loadTopics()
+        void loadClassifications()
         return () => { cancelled = true }
     }, [])
 
     return (
-        <section className="app-shell community-page topics-index-page">
-            <header className="page-intro"><div><p className="section-eyebrow">Explore ThoughtHub</p><h1>Browse topics</h1><p>Open a category or tag to find published writing from across the community.</p></div></header>
-            {!topics && !error && <LoadingState label="Loading topics…"/>}
+        <section className="app-shell community-page classifications-index-page">
+            <header className="page-intro"><div><p className="section-eyebrow">Explore ThoughtHub</p><h1>Categories and tags</h1><p>Browse the same categories and tags authors select when publishing.</p></div></header>
+            {!classifications && !error && <LoadingState label="Loading categories and tags…"/>}
             {error && <div className="app-alert app-alert--danger" role="alert">{error}</div>}
-            {topics && <>
-                <section className="topics-index-section"><div className="section-heading"><div><p className="section-eyebrow">Broad subjects</p><h2>Categories</h2></div><span className="post-count">{topics.categories.length} {topics.categories.length === 1 ? 'category' : 'categories'}</span></div><div className="topic-link-grid">{topics.categories.map((category, index) => <Link to={`/topics/${category.slug}`} key={category.id}><span>{String(index + 1).padStart(2, '0')}</span><strong>{category.name}</strong><Icon icon={arrowRightIcon} aria-hidden="true"/></Link>)}</div></section>
-                <section className="topics-index-section"><div className="section-heading"><div><p className="section-eyebrow">Specific ideas</p><h2>Tags</h2></div><span className="post-count">{topics.tags.length} {topics.tags.length === 1 ? 'tag' : 'tags'}</span></div><div className="topic-link-grid">{topics.tags.map((tag, index) => <Link to={`/topics/${tag.slug}`} key={tag.id}><span>{String(index + 1).padStart(2, '0')}</span><strong>#{tag.name}</strong><Icon icon={arrowRightIcon} aria-hidden="true"/></Link>)}</div></section>
+            {classifications && <>
+                <section className="classification-index-section"><div className="section-heading"><div><p className="section-eyebrow">Broad subjects</p><h2>Categories</h2></div><span className="post-count">{classifications.categories.length} {classifications.categories.length === 1 ? 'category' : 'categories'}</span></div><div className="classification-link-grid">{classifications.categories.map((category, index) => <Link to={`/categories/${category.slug}`} key={category.id}><span>{String(index + 1).padStart(2, '0')}</span><div><strong>{category.name}</strong>{category.description && <small>{category.description}</small>}</div><Icon icon={arrowRightIcon} aria-hidden="true"/></Link>)}</div></section>
+                <section className="classification-index-section"><div className="section-heading"><div><p className="section-eyebrow">Specific ideas</p><h2>Tags</h2></div><span className="post-count">{classifications.tags.length} {classifications.tags.length === 1 ? 'tag' : 'tags'}</span></div><div className="classification-link-grid">{classifications.tags.map((tag, index) => <Link to={`/tags/${tag.slug}`} key={tag.id}><span>{String(index + 1).padStart(2, '0')}</span><div><strong>#{tag.name}</strong></div><Icon icon={arrowRightIcon} aria-hidden="true"/></Link>)}</div></section>
             </>}
         </section>
     )
@@ -363,9 +403,9 @@ export function SearchPage() {
     return (
         <section className="app-shell community-page search-page">
             <header className="page-intro"><div><p className="section-eyebrow">Search ThoughtHub</p><h1>Find an idea worth reading.</h1></div></header>
-            <form className="search-page__form" role="search" onSubmit={handleSubmit}><Icon icon={searchIcon} aria-hidden="true"/><label className="visually-hidden" htmlFor="thought-search">Search published posts by title, author, or topic</label><input id="thought-search" type="search" value={input} onChange={(event) => setInput(event.target.value)} placeholder="Search titles, authors, and topics"/><span className="search-page__live-status" aria-live="polite">{isLoading ? 'Searching…' : 'Live results'}</span></form>
-            <div className="search-page__summary"><p><strong>{resultCount} {resultCount === 1 ? 'result' : 'results'}</strong>{query && <> for “{query}”</>}</p><div className="segmented-control"><span>Published posts</span><Link to="/topics">Browse topics</Link></div></div>
-            {isLoading && !resultsPage ? <LoadingState label="Searching ThoughtHub…"/> : error ? <div className="app-alert app-alert--danger" role="alert">{error}</div> : results.length > 0 ? <><PostRows posts={results}/>{(resultsPage?.previous || resultsPage?.next) && <nav className="pagination-bar" aria-label="Search result pages"><button className="button button--secondary" type="button" disabled={!resultsPage.previous} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</button><span>Page {page}</span><button className="button button--secondary" type="button" disabled={!resultsPage.next} onClick={() => setPage((current) => current + 1)}>Next</button></nav>}</> : <div className="empty-state"><Icon icon={searchIcon} aria-hidden="true"/><h2>No results yet</h2><p>Try a shorter phrase, check the spelling, or explore a topic instead.</p><Link className="button button--secondary" to="/topics">Browse topics</Link></div>}
+            <form className="search-page__form" role="search" onSubmit={handleSubmit}><Icon icon={searchIcon} aria-hidden="true"/><label className="visually-hidden" htmlFor="thought-search">Search published posts by title, author, category, or tag</label><input id="thought-search" type="search" value={input} onChange={(event) => setInput(event.target.value)} placeholder="Search titles, authors, categories, and tags"/><span className="search-page__live-status" aria-live="polite">{isLoading ? 'Searching…' : 'Live results'}</span></form>
+            <div className="search-page__summary"><p><strong>{resultCount} {resultCount === 1 ? 'result' : 'results'}</strong>{query && <> for “{query}”</>}</p><div className="segmented-control"><span>Published posts</span><Link to="/categories">Browse categories and tags</Link></div></div>
+            {isLoading && !resultsPage ? <LoadingState label="Searching ThoughtHub…"/> : error ? <div className="app-alert app-alert--danger" role="alert">{error}</div> : results.length > 0 ? <><PostRows posts={results}/>{(resultsPage?.previous || resultsPage?.next) && <nav className="pagination-bar" aria-label="Search result pages"><button className="button button--secondary" type="button" disabled={!resultsPage.previous} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</button><span>Page {page}</span><button className="button button--secondary" type="button" disabled={!resultsPage.next} onClick={() => setPage((current) => current + 1)}>Next</button></nav>}</> : <div className="empty-state"><Icon icon={searchIcon} aria-hidden="true"/><h2>No results yet</h2><p>Try a shorter phrase, check the spelling, or browse categories and tags instead.</p><Link className="button button--secondary" to="/categories">Browse categories and tags</Link></div>}
         </section>
     )
 }
@@ -499,12 +539,11 @@ export function CommunityGuidelinesPage() {
     return (
         <section className="app-shell community-page document-page">
             <header className="document-hero"><p className="section-eyebrow">ThoughtHub community</p><h1>Write freely. Treat people carefully.</h1><p>These guidelines keep ThoughtHub open to honest student ideas while protecting the people behind them.</p><span>Last updated August 2026</span></header>
-            <div className="document-layout"><aside><strong>On this page</strong><a href="#principles">Our principles</a><a href="#publish">What you can publish</a><a href="#remove">When content is removed</a><a href="#feedback">Feedback and revision</a><a href="#report">Reporting content</a></aside><div className="document-content">
+            <div className="document-layout"><aside><strong>On this page</strong><a href="#principles">Our principles</a><a href="#publish">What you can publish</a><a href="#remove">When content is removed</a><a href="#feedback">Feedback and revision</a></aside><div className="document-content">
                 <section id="principles"><span>01</span><h2>Our principles</h2><p>ThoughtHub is built for curiosity, honest experience, and useful disagreement. Students can publish immediately without waiting for approval.</p><div className="principle-grid"><div><Icon icon={messageIcon} aria-hidden="true"/><h3>Be human</h3><p>Write to people, not at them.</p></div><div><Icon icon={penLineIcon} aria-hidden="true"/><h3>Be original</h3><p>Share your thinking and credit sources.</p></div><div><Icon icon={shieldCheckIcon} aria-hidden="true"/><h3>Be responsible</h3><p>Protect privacy and avoid harm.</p></div></div></section>
                 <section id="publish"><span>02</span><h2>What you can publish</h2><p>Technology notes, tutorials, campus experiences, opinions, project stories, creative work, and personal reflections are welcome.</p><ul><li>Make it clear when something is your opinion.</li><li>Credit quotations, research, images, and borrowed ideas.</li><li>Ask permission before sharing another person’s private story.</li><li>Disagree with ideas without attacking the person.</li></ul></section>
                 <section id="remove"><span>03</span><h2>When content is removed</h2><p>Administrators may remove posts or comments containing harassment, private information, impersonation, dangerous instructions, spam, or copied work presented as original.</p><div className="document-note"><Icon icon={shieldCheckIcon} aria-hidden="true"/><p>Removal does not lock the author out. The author receives a reason and can revise and immediately republish after fixing the issue.</p></div></section>
                 <section id="feedback"><span>04</span><h2>Feedback and revision</h2><p>Moderation feedback should identify the problem, explain the relevant guideline, and suggest what the author can change. It should never shame the student.</p></section>
-                <section id="report"><span>05</span><h2>Reporting content</h2><p>Report a post or comment when it may break these guidelines. Reports are private and do not automatically remove content.</p><Link className="button button--secondary" to="/help">Ask a guidelines question</Link></section>
             </div></div>
         </section>
     )
@@ -515,7 +554,7 @@ export function HelpCenterPage() {
     const categories = [
         {icon: penLineIcon, title: 'Writing and publishing', text: 'Create posts, use content blocks, save drafts, and publish.'},
         {icon: userIcon, title: 'Account and profile', text: 'Sign in, reset a password, and understand your public profile.'},
-        {icon: shieldCheckIcon, title: 'Moderation and feedback', text: 'Understand removals, revise content, and report a concern.'},
+        {icon: shieldCheckIcon, title: 'Moderation and feedback', text: 'Understand removals, feedback, and how to revise content.'},
         {icon: usersIcon, title: 'Comments and community', text: 'Join discussions and manage your contributions.'},
     ]
     const questions = [
@@ -610,7 +649,7 @@ export function ModerationPage() {
     return (
         <section className="app-shell community-page moderation-page">
             <header className="page-intro"><div><p className="section-eyebrow">Administrator</p><h1>Moderation</h1><p>ThoughtHub already connects moderation actions through Django Admin.</p></div></header>
-            <div className="moderation-overview"><div><Icon icon={shieldCheckIcon} aria-hidden="true"/><h2>Review reported content</h2><p>Open the administrator workspace to inspect posts and comments, remove content, and write feedback for the author.</p><a className="button button--primary" href="/admin/">Open Django Admin <Icon icon={arrowRightIcon} aria-hidden="true"/></a></div><ol><li><span>1</span><div><strong>Review context</strong><p>Read the full post or comment before deciding.</p></div></li><li><span>2</span><div><strong>Choose a clear reason</strong><p>Explain the specific guideline problem.</p></div></li><li><span>3</span><div><strong>Send useful feedback</strong><p>The author can revise and immediately republish.</p></div></li></ol></div>
+            <div className="moderation-overview"><div><Icon icon={shieldCheckIcon} aria-hidden="true"/><h2>Review published content</h2><p>Open the administrator workspace to inspect posts and comments, remove content, and write feedback for the author.</p><a className="button button--primary" href="/admin/">Open administrator workspace <Icon icon={arrowRightIcon} aria-hidden="true"/></a></div><ol><li><span>1</span><div><strong>Review context</strong><p>Read the full post or comment before deciding.</p></div></li><li><span>2</span><div><strong>Choose a clear reason</strong><p>Explain the specific guideline problem.</p></div></li><li><span>3</span><div><strong>Send useful feedback</strong><p>The author can revise and immediately republish.</p></div></li></ol></div>
         </section>
     )
 }

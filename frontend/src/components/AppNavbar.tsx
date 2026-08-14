@@ -1,11 +1,12 @@
 import {Icon} from '@iconify/react'
 import bellIcon from '@iconify-icons/lucide/bell'
 import bookmarkIcon from '@iconify-icons/lucide/bookmark'
+import chevronDownIcon from '@iconify-icons/lucide/chevron-down'
 import menuIcon from '@iconify-icons/lucide/menu'
 import penLineIcon from '@iconify-icons/lucide/pen-line'
 import searchIcon from '@iconify-icons/lucide/search'
 import xIcon from '@iconify-icons/lucide/x'
-import {useEffect, useState, type FormEvent} from 'react'
+import {useEffect, useRef, useState, type FormEvent} from 'react'
 import {
     Link,
     NavLink,
@@ -34,6 +35,8 @@ export function AppNavbar() {
     const [logoutError, setLogoutError] =
         useState<string | null>(null)
     const [isMenuOpen, setIsMenuOpen] = useState(false)
+    const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
+    const profileMenuRef = useRef<HTMLDivElement>(null)
     const [searchInput, setSearchInput] = useState(() =>
         new URLSearchParams(location.search).get('q') ?? '',
     )
@@ -82,8 +85,34 @@ export function AppNavbar() {
         return () => window.clearTimeout(timeoutId)
     }, [location.pathname, location.search, navigate, searchInput])
 
+    useEffect(() => {
+        function closeProfileMenu(event: MouseEvent) {
+            if (
+                profileMenuRef.current &&
+                !profileMenuRef.current.contains(event.target as Node)
+            ) {
+                setIsProfileMenuOpen(false)
+            }
+        }
+
+        function closeProfileMenuWithKeyboard(event: KeyboardEvent) {
+            if (event.key === 'Escape') {
+                setIsProfileMenuOpen(false)
+            }
+        }
+
+        document.addEventListener('click', closeProfileMenu)
+        document.addEventListener('keydown', closeProfileMenuWithKeyboard)
+
+        return () => {
+            document.removeEventListener('click', closeProfileMenu)
+            document.removeEventListener('keydown', closeProfileMenuWithKeyboard)
+        }
+    }, [])
+
     function closeMenu() {
         setIsMenuOpen(false)
+        setIsProfileMenuOpen(false)
     }
 
     function submitSearch(event: FormEvent<HTMLFormElement>) {
@@ -103,6 +132,7 @@ export function AppNavbar() {
 
         try {
             await logout()
+            closeMenu()
             navigate('/', {replace: true})
         } catch (error) {
             setLogoutError(
@@ -142,9 +172,9 @@ export function AppNavbar() {
                             className={({isActive}) =>
                                 `app-nav-link ${isActive ? 'active' : ''}`
                             }
-                            to="/topics"
+                            to="/categories"
                         >
-                            Topics
+                            Categories
                         </NavLink>
                         {isAuthenticated && (
                             <NavLink
@@ -156,6 +186,16 @@ export function AppNavbar() {
                                 Dashboard
                             </NavLink>
                         )}
+                        {user?.is_staff && (
+                            <NavLink
+                                className={({isActive}) =>
+                                    `app-nav-link ${isActive ? 'active' : ''}`
+                                }
+                                to="/moderation"
+                            >
+                                Moderation
+                            </NavLink>
+                        )}
                     </div>
 
                     <form
@@ -165,14 +205,14 @@ export function AppNavbar() {
                     >
                         <Icon icon={searchIcon} aria-hidden="true"/>
                         <label className="visually-hidden" htmlFor="navbar-search">
-                            Search published posts by title, author, or topic
+                            Search published posts by title, author, category, or tag
                         </label>
                         <input
                             id="navbar-search"
                             type="search"
                             value={searchInput}
                             onChange={(event) => setSearchInput(event.target.value)}
-                            placeholder="Search titles, authors, topics"
+                            placeholder="Search posts"
                         />
                     </form>
 
@@ -215,22 +255,55 @@ export function AppNavbar() {
                                     )}
                                 </Link>
                                 <ThemeToggle/>
-                                <Link
-                                    className="app-user-button"
-                                    to={`/profile/${user.username}`}
-                                    aria-label={`${displayName}'s profile`}
-                                >
-                                    <span aria-hidden="true">{initials || 'TH'}</span>
-                                    <strong>{displayName}</strong>
-                                </Link>
-                                <button
-                                    className="app-logout-button"
-                                    type="button"
-                                    disabled={isLoggingOut}
-                                    onClick={() => void handleLogout()}
-                                >
-                                    {isLoggingOut ? 'Logging out…' : 'Log out'}
-                                </button>
+                                <div className="app-profile-menu" ref={profileMenuRef}>
+                                    <button
+                                        className="app-user-button"
+                                        type="button"
+                                        aria-label={`Open ${displayName}'s profile menu`}
+                                        aria-expanded={isProfileMenuOpen}
+                                        aria-controls="app-profile-menu-panel"
+                                        onClick={() => setIsProfileMenuOpen((current) => !current)}
+                                    >
+                                        <span aria-hidden="true">{initials || 'TH'}</span>
+                                        <strong>{displayName}</strong>
+                                        <Icon
+                                            className="app-user-button__chevron"
+                                            icon={chevronDownIcon}
+                                            aria-hidden="true"
+                                        />
+                                    </button>
+                                    {isProfileMenuOpen && (
+                                        <nav
+                                            className="app-profile-menu__panel"
+                                            id="app-profile-menu-panel"
+                                            aria-label="Profile menu"
+                                        >
+                                            <div className="app-profile-menu__identity">
+                                                <strong>{displayName}</strong>
+                                                <span>@{user.username}</span>
+                                            </div>
+                                            <Link
+                                                to={`/profile/${user.username}`}
+                                                onClick={() => setIsProfileMenuOpen(false)}
+                                            >
+                                                View profile
+                                            </Link>
+                                            <Link
+                                                to="/settings"
+                                                onClick={() => setIsProfileMenuOpen(false)}
+                                            >
+                                                Settings
+                                            </Link>
+                                            <button
+                                                type="button"
+                                                disabled={isLoggingOut}
+                                                onClick={() => void handleLogout()}
+                                            >
+                                                {isLoggingOut ? 'Logging out…' : 'Log out'}
+                                            </button>
+                                        </nav>
+                                    )}
+                                </div>
                             </>
                         ) : (
                             <>
@@ -265,24 +338,38 @@ export function AppNavbar() {
                         >
                             <Icon icon={searchIcon} aria-hidden="true"/>
                             <label className="visually-hidden" htmlFor="mobile-navbar-search">
-                                Search published posts by title, author, or topic
+                                Search published posts by title, author, category, or tag
                             </label>
                             <input
                                 id="mobile-navbar-search"
                                 type="search"
                                 value={searchInput}
                                 onChange={(event) => setSearchInput(event.target.value)}
-                                placeholder="Search titles, authors, topics"
+                                placeholder="Search posts"
                             />
                         </form>
                         <NavLink to="/" end onClick={closeMenu}>Home</NavLink>
-                        <NavLink to="/topics" onClick={closeMenu}>Topics</NavLink>
+                        <NavLink to="/categories" onClick={closeMenu}>Categories and tags</NavLink>
                         {isAuthenticated ? (
                             <>
                                 <NavLink to="/dashboard" onClick={closeMenu}>Dashboard</NavLink>
                                 <NavLink to="/saved" onClick={closeMenu}>Saved posts</NavLink>
                                 <NavLink to="/notifications" onClick={closeMenu}>Notifications</NavLink>
+                                {user && (
+                                    <NavLink to={`/profile/${user.username}`} onClick={closeMenu}>
+                                        View profile
+                                    </NavLink>
+                                )}
                                 <NavLink to="/settings" onClick={closeMenu}>Settings</NavLink>
+                                {user?.is_staff && <NavLink to="/moderation" onClick={closeMenu}>Moderation</NavLink>}
+                                <button
+                                    className="app-mobile-menu__logout"
+                                    type="button"
+                                    disabled={isLoggingOut}
+                                    onClick={() => void handleLogout()}
+                                >
+                                    {isLoggingOut ? 'Logging out…' : 'Log out'}
+                                </button>
                             </>
                         ) : (
                             <>

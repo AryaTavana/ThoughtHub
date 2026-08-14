@@ -31,6 +31,7 @@ export interface Category {
     id: number
     name: string
     slug: string
+    description: string
 }
 
 export interface Tag {
@@ -50,8 +51,11 @@ export interface PublicPostListItem {
     featured_image: string | null
     featured_image_alt: string
     post_type: PostType
+    is_featured: boolean
     published_at: string
     reading_time: number
+    views: number
+    comments: number
 }
 
 export type AuthorPostListItem =
@@ -165,8 +169,10 @@ export interface PublishedPostListParameters {
     page?: number
     search?: string
     author?: string
-    topic?: string
-    ordering?: 'newest' | 'liked' | 'viewed'
+    category?: string
+    tag?: string
+    postType?: PostType
+    ordering?: 'newest' | 'viewed'
 }
 
 export function getPublishedPosts(
@@ -186,8 +192,16 @@ export function getPublishedPosts(
         searchParameters.set('author', parameters.author.trim())
     }
 
-    if (parameters.topic?.trim()) {
-        searchParameters.set('topic', parameters.topic.trim())
+    if (parameters.category?.trim()) {
+        searchParameters.set('category', parameters.category.trim())
+    }
+
+    if (parameters.tag?.trim()) {
+        searchParameters.set('tag', parameters.tag.trim())
+    }
+
+    if (parameters.postType) {
+        searchParameters.set('post_type', parameters.postType)
     }
 
     if (parameters.ordering && parameters.ordering !== 'newest') {

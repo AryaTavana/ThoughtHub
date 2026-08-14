@@ -74,15 +74,32 @@ export function PublicPostsPage() {
         return () => { isCancelled = true }
     }, [discoveryMode, page, reloadKey])
 
-    const topics = Array.from(
-        new Map(
-            (postsPage?.results ?? []).flatMap((post) => [
-                ...(post.category
-                    ? [[post.category.slug, post.category.name] as const]
-                    : []),
-                ...post.tags.map((tag) => [tag.slug, tag.name] as const),
-            ]),
-        ),
+    const classificationsByKey = new Map<string, {
+        name: string
+        to: string
+        type: 'Category' | 'Tag'
+    }>()
+    for (const post of postsPage?.results ?? []) {
+        if (post.category) {
+            classificationsByKey.set(
+                `category:${post.category.slug}`,
+                {
+                    name: post.category.name,
+                    to: `/categories/${post.category.slug}`,
+                    type: 'Category',
+                },
+            )
+        }
+        for (const tag of post.tags) {
+            classificationsByKey.set(`tag:${tag.slug}`, {
+                name: `#${tag.name}`,
+                to: `/tags/${tag.slug}`,
+                type: 'Tag',
+            })
+        }
+    }
+    const classifications = Array.from(
+        classificationsByKey.values(),
     ).slice(0, 6)
 
     return (
@@ -176,7 +193,7 @@ export function PublicPostsPage() {
                             <h3 className="visually-hidden">Latest posts</h3>
                             <div className="post-card-grid">
                                 {postsPage.results.map((post, index) => (
-                                    <article className={`post-card ${index === 0 ? 'post-card--featured' : ''}`} key={post.id}>
+                                    <article className={`post-card ${post.is_featured ? 'post-card--featured' : ''}`} key={post.id}>
                                         <div className="post-card__media">
                                             {post.featured_image ? (
                                                 <img src={post.featured_image} alt={post.featured_image_alt} loading="lazy"/>
@@ -186,17 +203,18 @@ export function PublicPostsPage() {
                                         </div>
                                         <div className="post-card__body">
                                             <div className="post-card__topline">
-                                                <span className="content-label">{post.category?.name ?? post.post_type}</span>
+                                                {post.category ? <Link className="content-label" to={`/categories/${post.category.slug}`}>{post.category.name}</Link> : <span className="content-label">{post.post_type}</span>}
                                                 <SavedPostButton post={{slug: post.slug, title: post.title, excerpt: post.excerpt, author: post.author_username ?? 'Deleted user', category: post.category?.name ?? post.post_type, readingTime: post.reading_time}}/>
                                             </div>
                                             <h3><Link to={`/posts/${post.slug}`}>{post.title}</Link></h3>
                                             {post.excerpt && <p>{post.excerpt}</p>}
                                             <div className="post-card__tag-slot">
-                                                {post.tags.length > 0 && <div className="post-tags">{post.tags.map((tag) => <span key={tag.id}>#{tag.name}</span>)}</div>}
+                                                {post.tags.length > 0 && <div className="post-tags">{post.tags.map((tag) => <Link to={`/tags/${tag.slug}`} key={tag.id}>#{tag.name}</Link>)}</div>}
                                             </div>
                                             <div className="post-card__meta">
                                                 <span>By {post.author_username ?? 'Deleted user'}</span>
                                                 <span><time dateTime={post.published_at}>{formatPublishedDate(post.published_at)}</time> · {post.reading_time} min read</span>
+                                                <span>{post.views} {post.views === 1 ? 'view' : 'views'} · {post.comments} {post.comments === 1 ? 'comment' : 'comments'}</span>
                                             </div>
                                         </div>
                                     </article>
@@ -215,15 +233,15 @@ export function PublicPostsPage() {
                 </div>
             </section>
 
-            <section className="home-topics">
+            <section className="home-classifications">
                 <div className="app-shell">
                     <div className="section-heading">
-                        <div><p className="section-eyebrow">Topics in this feed</p><h2>Explore these topics</h2></div>
-                        <Link className="quiet-link" to="/topics">View all topics <Icon icon={arrowRightIcon} aria-hidden="true"/></Link>
+                        <div><p className="section-eyebrow">How posts are organized</p><h2>Explore categories and tags</h2></div>
+                        <Link className="quiet-link" to="/categories">View all <Icon icon={arrowRightIcon} aria-hidden="true"/></Link>
                     </div>
-                    {topics.length > 0 && <div className="topic-link-grid">
-                        {topics.map(([slug, name], index) => (
-                            <Link to={`/topics/${slug}`} key={slug}><span>{String(index + 1).padStart(2, '0')}</span><strong>{name} thoughts</strong><Icon icon={arrowRightIcon} aria-hidden="true"/></Link>
+                    {classifications.length > 0 && <div className="classification-link-grid">
+                        {classifications.map((classification, index) => (
+                            <Link to={classification.to} key={classification.to}><span>{String(index + 1).padStart(2, '0')}</span><div><strong>{classification.name}</strong><small>{classification.type}</small></div><Icon icon={arrowRightIcon} aria-hidden="true"/></Link>
                         ))}
                     </div>}
                 </div>

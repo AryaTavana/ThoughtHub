@@ -1,4 +1,8 @@
 import {
+    lazy,
+    Suspense,
+} from 'react'
+import {
     Link,
     Route,
     Routes,
@@ -14,21 +18,50 @@ import {PublicPostDetailPage} from './pages/PublicPostDetailPage'
 import {DashboardPage} from './pages/DashboardPage'
 import {PostEditorPage} from './pages/PostEditorPage'
 import {SiteFooter} from './components/SiteFooter'
-import {
-    CommunityGuidelinesPage,
-    HelpCenterPage,
-    ModerationPage,
-    NotificationsPage,
-    OfflineStatePage,
-    PasswordRecoveryPage,
-    PublicProfilePage,
-    RemovedPostPage,
-    SavedPostsPage,
-    SearchPage,
-    SettingsPage,
-    TopicPage,
-    TopicsIndexPage,
-} from './pages/CommunityPages'
+
+const loadCommunityPages = () => import('./pages/CommunityPages')
+const CategoriesTagsPage = lazy(async () => ({
+    default: (await loadCommunityPages()).CategoriesTagsPage,
+}))
+const CategoryPage = lazy(async () => ({
+    default: (await loadCommunityPages()).CategoryPage,
+}))
+const CommunityGuidelinesPage = lazy(async () => ({
+    default: (await loadCommunityPages()).CommunityGuidelinesPage,
+}))
+const HelpCenterPage = lazy(async () => ({
+    default: (await loadCommunityPages()).HelpCenterPage,
+}))
+const ModerationPage = lazy(async () => ({
+    default: (await loadCommunityPages()).ModerationPage,
+}))
+const NotificationsPage = lazy(async () => ({
+    default: (await loadCommunityPages()).NotificationsPage,
+}))
+const OfflineStatePage = lazy(async () => ({
+    default: (await loadCommunityPages()).OfflineStatePage,
+}))
+const PasswordRecoveryPage = lazy(async () => ({
+    default: (await loadCommunityPages()).PasswordRecoveryPage,
+}))
+const PublicProfilePage = lazy(async () => ({
+    default: (await loadCommunityPages()).PublicProfilePage,
+}))
+const RemovedPostPage = lazy(async () => ({
+    default: (await loadCommunityPages()).RemovedPostPage,
+}))
+const SavedPostsPage = lazy(async () => ({
+    default: (await loadCommunityPages()).SavedPostsPage,
+}))
+const SearchPage = lazy(async () => ({
+    default: (await loadCommunityPages()).SearchPage,
+}))
+const SettingsPage = lazy(async () => ({
+    default: (await loadCommunityPages()).SettingsPage,
+}))
+const TagPage = lazy(async () => ({
+    default: (await loadCommunityPages()).TagPage,
+}))
 
 function NotFoundPage() {
     return (
@@ -52,7 +85,8 @@ function App() {
             <a className="skip-link" href="#main-content">Skip to main content</a>
             <AppNavbar/>
             <main id="main-content" tabIndex={-1}>
-                <Routes>
+                <Suspense fallback={<section className="app-shell community-page"><div className="content-state" role="status"><span className="loading-ring" aria-hidden="true"/><p>Loading page…</p></div></section>}>
+                    <Routes>
                     <Route path="/" element={<PublicPostsPage/>}/>
                     <Route
                         path="/posts/:slug"
@@ -76,8 +110,9 @@ function App() {
                         element={<PublicProfilePage/>}
                     />
                     <Route path="/search" element={<SearchPage/>}/>
-                    <Route path="/topics" element={<TopicsIndexPage/>}/>
-                    <Route path="/topics/:topic" element={<TopicPage/>}/>
+                    <Route path="/categories" element={<CategoriesTagsPage/>}/>
+                    <Route path="/categories/:category" element={<CategoryPage/>}/>
+                    <Route path="/tags/:tag" element={<TagPage/>}/>
                     <Route
                         path="/guidelines"
                         element={<CommunityGuidelinesPage/>}
@@ -107,7 +142,8 @@ function App() {
                         <Route path="/moderation" element={<ModerationPage/>}/>
                     </Route>
                     <Route path="*" element={<NotFoundPage/>}/>
-                </Routes>
+                    </Routes>
+                </Suspense>
             </main>
             <SiteFooter/>
         </div>

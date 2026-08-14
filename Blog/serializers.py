@@ -18,6 +18,7 @@ class CategorySerializer(serializers.ModelSerializer):
             'id',
             'name',
             'slug',
+            'description',
         )
         read_only_fields = fields
 
@@ -241,8 +242,11 @@ class PublicPostListSerializer(serializers.ModelSerializer):
             'featured_image',
             'featured_image_alt',
             'post_type',
+            'is_featured',
             'published_at',
             'reading_time',
+            'views',
+            'comments',
         )
         read_only_fields = fields
 

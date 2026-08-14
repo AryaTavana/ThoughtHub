@@ -8,6 +8,8 @@ import arrowUpRightIcon from '@iconify-icons/lucide/arrow-up-right'
 import bookOpenIcon from '@iconify-icons/lucide/book-open'
 import clockIcon from '@iconify-icons/lucide/clock-3'
 import calendarIcon from '@iconify-icons/lucide/calendar-days'
+import eyeIcon from '@iconify-icons/lucide/eye'
+import messageIcon from '@iconify-icons/lucide/message-circle'
 import penLineIcon from '@iconify-icons/lucide/pen-line'
 import tagIcon from '@iconify-icons/lucide/tag'
 import {
@@ -189,9 +191,12 @@ export function PublicPostDetailPage() {
                                     {post.category &&
                                         post.category.name.toLowerCase() !==
                                             post.post_type.toLowerCase() && (
-                                        <span className="content-label">
+                                        <Link
+                                            className="content-label"
+                                            to={`/categories/${post.category.slug}`}
+                                        >
                                             {post.category.name}
-                                        </span>
+                                        </Link>
                                     )}
                                 </div>
 
@@ -247,19 +252,35 @@ export function PublicPostDetailPage() {
                                             <strong>{post.reading_time} min read</strong>
                                         </span>
                                     </div>
+
+                                    <div>
+                                        <Icon icon={eyeIcon} aria-hidden="true"/>
+                                        <span>
+                                            <small>Readers</small>
+                                            <strong>{post.views} {post.views === 1 ? 'view' : 'views'}</strong>
+                                        </span>
+                                    </div>
+
+                                    <div>
+                                        <Icon icon={messageIcon} aria-hidden="true"/>
+                                        <span>
+                                            <small>Discussion</small>
+                                            <strong>{post.comments} {post.comments === 1 ? 'comment' : 'comments'}</strong>
+                                        </span>
+                                    </div>
                                 </div>
 
                                 {post.tags.length > 0 && (
                                     <div className="post-article__tag-group">
                                         <span>
                                             <Icon icon={tagIcon} aria-hidden="true"/>
-                                            Topics
+                                            Tags
                                         </span>
                                         <div className="post-tags post-article__tags">
                                             {post.tags.map((tag) => (
                                                 <Link
                                                     key={tag.id}
-                                                    to={`/topics/${tag.slug}`}
+                                                    to={`/tags/${tag.slug}`}
                                                 >
                                                     #{tag.name}
                                                 </Link>

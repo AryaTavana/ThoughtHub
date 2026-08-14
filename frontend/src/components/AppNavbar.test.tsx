@@ -43,6 +43,7 @@ const signedOutAuth: AuthContextValue = {
   initializationError: null,
   login: vi.fn(),
   register: vi.fn(),
+  updateProfile: vi.fn(),
   logout: logoutMock,
 }
 
@@ -113,16 +114,18 @@ describe('AppNavbar', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('opens live search automatically while the user types', async () => {
+  it('waits for submission before leaving the current page', async () => {
     const user = userEvent.setup()
     renderNavbar()
 
-    await user.type(
-      screen.getByRole('searchbox', {
-        name: 'Search posts, people, and topics',
-      }),
-      'Django',
-    )
+    const searchbox = screen.getByRole('searchbox', {
+      name: 'Search published posts by title, author, or topic',
+    })
+    await user.type(searchbox, 'Django')
+
+    expect(screen.getByTestId('current-path')).toHaveTextContent('/')
+
+    await user.keyboard('{Enter}')
 
     await waitFor(() => {
       expect(screen.getByTestId('current-path')).toHaveTextContent(

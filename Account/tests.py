@@ -1,8 +1,15 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
+from django.core import mail
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
+
+from Blog.models import Category, Post, PostBlock, Tag
 
 
 User = get_user_model()
@@ -498,3 +505,230 @@ class CurrentUserAPITests(APITestCase):
         self.assertEqual(response.data['email'], 'arya@example.com')
         self.assertFalse(response.data['is_staff'])
         self.assertNotIn('password', response.data)
+
+    def test_authenticated_user_can_update_public_identity_fields(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.patch(
+            self.url,
+            {
+                'email': 'NEW-ARYA@EXAMPLE.COM',
+                'first_name': 'Arya',
+                'last_name': 'Tavana',
+                'username': 'cannot-change-this',
+                'is_staff': True,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, 'arya')
+        self.assertEqual(self.user.email, 'new-arya@example.com')
+        self.assertEqual(self.user.first_name, 'Arya')
+        self.assertEqual(self.user.last_name, 'Tavana')
+        self.assertFalse(self.user.is_staff)
+
+    def test_profile_update_rejects_another_users_email(self):
+        User.objects.create_user(
+            username='email-owner',
+            email='owner@example.com',
+            password='Strong-test-password-456',
+        )
+        self.client.force_authenticate(self.user)
+
+        response = self.client.patch(
+            self.url,
+            {'email': 'OWNER@EXAMPLE.COM'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('email', response.data)
+
+
+class PublicUserProfileAPITests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            username='public-author',
+            email='private@example.com',
+            first_name='Public',
+            last_name='Author',
+            password='Strong-test-password-123',
+        )
+        category = Category.objects.create(
+            name='Development',
+            slug='development',
+        )
+        tag = Tag.objects.create(name='Django', slug='django')
+        cls.public_post = Post.objects.create(
+            title='Public profile post',
+            content='one two three',
+            author=cls.user,
+            category=category,
+            status=Post.Status.PUBLISHED,
+            published_at=timezone.now(),
+        )
+        cls.public_post.tags.add(tag)
+        PostBlock.objects.create(
+            post=cls.public_post,
+            content='<p>four five</p>',
+        )
+        Post.objects.create(
+            title='Private profile draft',
+            author=cls.user,
+            status=Post.Status.DRAFT,
+        )
+        cls.url = reverse(
+            'account:public-user-profile',
+            args=(cls.user.username,),
+        )
+
+    def test_anonymous_visitor_receives_real_public_profile_statistics(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['username'], self.user.username)
+        self.assertEqual(response.data['first_name'], 'Public')
+        self.assertEqual(response.data['last_name'], 'Author')
+        self.assertEqual(response.data['published_posts_count'], 1)
+        self.assertEqual(response.data['total_reading_time'], 1)
+        self.assertEqual(response.data['topics_count'], 3)
+        self.assertNotIn('email', response.data)
+
+    def test_unknown_or_inactive_profile_returns_not_found(self):
+        self.user.is_active = False
+        self.user.save(update_fields=('is_active',))
+
+        inactive_response = self.client.get(self.url)
+        missing_response = self.client.get(
+            reverse('account:public-user-profile', args=('missing-user',)),
+        )
+
+        self.assertEqual(
+            inactive_response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+        self.assertEqual(
+            missing_response.status_code,
+            status.HTTP_404_NOT_FOUND,
+        )
+
+
+class PasswordResetAPITests(APITestCase):
+    new_password = 'New!SecurePassphrase-93'
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            username='reset-user',
+            email='reset@example.com',
+            password='Old!SecurePassphrase-47',
+        )
+        cls.csrf_url = reverse('account:csrf-token')
+        cls.request_url = reverse('account:password-reset')
+        cls.confirm_url = reverse('account:password-reset-confirm')
+
+    def setUp(self):
+        self.client = APIClient(enforce_csrf_checks=True)
+
+    def get_csrf_token(self):
+        response = self.client.get(self.csrf_url)
+        return response.cookies[settings.CSRF_COOKIE_NAME].value
+
+    def test_reset_request_requires_csrf_and_does_not_reveal_accounts(self):
+        without_csrf = self.client.post(
+            self.request_url,
+            {'email': self.user.email},
+            format='json',
+        )
+        csrf_token = self.get_csrf_token()
+        known_response = self.client.post(
+            self.request_url,
+            {'email': self.user.email},
+            format='json',
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+        unknown_response = self.client.post(
+            self.request_url,
+            {'email': 'missing@example.com'},
+            format='json',
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(without_csrf.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(known_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(unknown_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(known_response.data, unknown_response.data)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('/password-recovery/', mail.outbox[0].body)
+
+    def test_valid_one_use_token_updates_password(self):
+        csrf_token = self.get_csrf_token()
+        payload = {
+            'uid': urlsafe_base64_encode(force_bytes(self.user.pk)),
+            'token': default_token_generator.make_token(self.user),
+            'new_password': self.new_password,
+            'new_password_confirm': self.new_password,
+        }
+
+        response = self.client.post(
+            self.confirm_url,
+            payload,
+            format='json',
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+        reused_response = self.client.post(
+            self.confirm_url,
+            payload,
+            format='json',
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(self.new_password))
+        self.assertEqual(
+            reused_response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertIn('token', reused_response.data)
+
+    def test_reset_confirmation_validates_password_and_matching_fields(self):
+        csrf_token = self.get_csrf_token()
+        base_payload = {
+            'uid': urlsafe_base64_encode(force_bytes(self.user.pk)),
+            'token': default_token_generator.make_token(self.user),
+        }
+        mismatch_response = self.client.post(
+            self.confirm_url,
+            {
+                **base_payload,
+                'new_password': self.new_password,
+                'new_password_confirm': 'Different!Passphrase-93',
+            },
+            format='json',
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+        weak_response = self.client.post(
+            self.confirm_url,
+            {
+                **base_payload,
+                'new_password': 'password',
+                'new_password_confirm': 'password',
+            },
+            format='json',
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+
+        self.assertEqual(
+            mismatch_response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertIn('new_password_confirm', mismatch_response.data)
+        self.assertEqual(
+            weak_response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertIn('new_password', weak_response.data)

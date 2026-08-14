@@ -588,6 +588,59 @@ class PublicPostListAPITests(APITestCase):
             status.HTTP_405_METHOD_NOT_ALLOWED,
         )
 
+    def test_list_filters_by_exact_author_and_topic(self):
+        user_model = get_user_model()
+        author = user_model.objects.create_user(username='filter-author')
+        other_author = user_model.objects.create_user(username='other-author')
+        category = Category.objects.create(name='Engineering', slug='engineering')
+        tag = Tag.objects.create(name='Python', slug='python')
+        matching_post = Post.objects.create(
+            title='Matching post',
+            author=author,
+            category=category,
+            status=Post.Status.PUBLISHED,
+        )
+        matching_post.tags.add(tag)
+        Post.objects.create(
+            title='Other post',
+            author=other_author,
+            status=Post.Status.PUBLISHED,
+        )
+
+        author_response = self.client.get(self.url, {'author': author.username})
+        category_response = self.client.get(self.url, {'topic': 'engineering'})
+        tag_response = self.client.get(self.url, {'topic': 'PYTHON'})
+        missing_response = self.client.get(self.url, {'topic': 'missing'})
+
+        for response in (author_response, category_response, tag_response):
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data['count'], 1)
+            self.assertEqual(
+                response.data['results'][0]['slug'],
+                matching_post.slug,
+            )
+        self.assertEqual(missing_response.data['count'], 0)
+
+    def test_list_orders_across_the_queryset_by_real_counters(self):
+        self.public_post.likes = 2
+        self.public_post.views = 4
+        self.public_post.save(update_fields=('likes', 'views'))
+        self.second_public_post.likes = 8
+        self.second_public_post.views = 1
+        self.second_public_post.save(update_fields=('likes', 'views'))
+
+        liked_response = self.client.get(self.url, {'ordering': 'liked'})
+        viewed_response = self.client.get(self.url, {'ordering': 'viewed'})
+
+        self.assertEqual(
+            liked_response.data['results'][0]['slug'],
+            self.second_public_post.slug,
+        )
+        self.assertEqual(
+            viewed_response.data['results'][0]['slug'],
+            self.public_post.slug,
+        )
+
 
 class PublicPostDetailAPITests(APITestCase):
     @classmethod
@@ -634,6 +687,8 @@ class PublicPostDetailAPITests(APITestCase):
             response.data['blocks'][0]['content'],
             '<p>Public block content</p>',
         )
+        self.public_post.refresh_from_db()
+        self.assertEqual(self.public_post.views, 1)
 
     def test_draft_post_returns_not_found(self):
         url = reverse(

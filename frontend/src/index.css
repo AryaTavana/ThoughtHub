@@ -36,7 +36,7 @@
   --link-visited: #c4a8ff;
 
   --button-primary-bg: #6678ee;
-  --button-primary-text: #ffffff;
+  --button-primary-text: #080d1a;
   --button-primary-hover: #7b8cff;
   --button-secondary-bg: #1b2944;
   --button-secondary-text: #edf1ff;
@@ -118,7 +118,7 @@
   --text-title: #24304d;
   --text-body: #3b4865;
   --text-secondary: #687593;
-  --text-muted: #8a95ad;
+  --text-muted: #64718f;
   --text-disabled: #c2cadb;
   --text-inverse: #fcfcff;
 
@@ -253,6 +253,12 @@ a:hover {
 
 a:visited {
   color: var(--link-visited);
+}
+
+:where(a, button, summary):focus-visible {
+  border-radius: 6px;
+  outline: 3px solid var(--form-input-focus);
+  outline-offset: 3px;
 }
 
 :where(h1, h2, h3, h4, h5, h6) {

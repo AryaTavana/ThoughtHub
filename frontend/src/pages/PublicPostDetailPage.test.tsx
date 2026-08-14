@@ -160,7 +160,9 @@ describe('PublicPostDetailPage', () => {
         level: 1,
       }),
     ).toBeInTheDocument()
-    expect(document.title).toBe('Django and React Guide')
+    await waitFor(() => {
+      expect(document.title).toBe('Django and React Guide')
+    })
     expect(
       screen.getByText(
         'A practical guide to connecting both frameworks.',

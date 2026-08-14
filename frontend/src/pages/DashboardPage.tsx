@@ -67,10 +67,10 @@ export function DashboardPage() {
 
             {postsPage && postsPage.count > 0 && (
                 <div className="dashboard-stats" aria-label="Post summary">
-                    <div><span>Total posts</span><strong>{postsPage.count}</strong><small>Across your ThoughtHub account</small></div>
-                    <div><span>Published here</span><strong>{publishedCount}</strong><small>Visible to readers</small></div>
-                    <div><span>Drafts here</span><strong>{draftCount}</strong><small>Still being shaped</small></div>
-                    <div><span>Needs revision</span><strong>{removedCount}</strong><small>Feedback is waiting</small></div>
+                    <div><span>Total posts</span><strong>{postsPage.count}</strong><small>Across every page</small></div>
+                    <div><span>Published</span><strong>{publishedCount}</strong><small>On this page</small></div>
+                    <div><span>Drafts</span><strong>{draftCount}</strong><small>On this page</small></div>
+                    <div><span>Needs revision</span><strong>{removedCount}</strong><small>On this page</small></div>
                 </div>
             )}
 

@@ -9,7 +9,7 @@ export function SiteFooter() {
                     <small>A modern home for university voices.</small>
                 </Link>
                 <nav aria-label="Footer navigation">
-                    <Link to="/topics/technology">Topics</Link>
+                    <Link to="/topics">Topics</Link>
                     <Link to="/guidelines">Guidelines</Link>
                     <Link to="/help">Help</Link>
                 </nav>

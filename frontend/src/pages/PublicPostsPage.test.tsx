@@ -291,6 +291,22 @@ describe('PublicPostsPage', () => {
     })
   })
 
+  it('asks the backend to sort the complete result set', async () => {
+    getPublishedPostsMock.mockResolvedValue(firstPage)
+    const user = userEvent.setup()
+    renderPostsPage()
+    await screen.findByRole('link', {name: 'Learning Django and React'})
+
+    await user.click(screen.getByRole('button', {name: 'Most viewed'}))
+
+    await waitFor(() => {
+      expect(getPublishedPostsMock).toHaveBeenLastCalledWith({
+        page: 1,
+        ordering: 'viewed',
+      })
+    })
+  })
+
   it('ignores a late result from a cancelled effect', async () => {
     let resolveAbandonedRequest: (
       page: PaginatedResponse<PublicPostListItem>,

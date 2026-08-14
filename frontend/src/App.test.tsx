@@ -54,6 +54,7 @@ const signedOutAuth: AuthContextValue = {
   initializationError: null,
   login: vi.fn(),
   register: vi.fn(),
+  updateProfile: vi.fn(),
   logout: vi.fn(),
 }
 
@@ -105,6 +106,10 @@ describe('application routes', () => {
     expect(
       screen.queryByRole('link', { name: 'Dashboard' }),
     ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Skip to main content' }),
+    ).toHaveAttribute('href', '#main-content')
+    expect(screen.getAllByRole('main')).toHaveLength(1)
   })
 
   it.each([
@@ -116,6 +121,7 @@ describe('application routes', () => {
     expect(
       screen.getByRole('heading', { name: heading }),
     ).toBeInTheDocument()
+    expect(screen.getAllByRole('main')).toHaveLength(1)
   })
 
   it('renders a public post detail route without authentication', () => {

@@ -72,6 +72,26 @@ class PublicPostListView(ListAPIView):
                 | Q(blocks__content__icontains=search)
             ).distinct()
 
+        author = self.request.query_params.get('author', '').strip()
+        if author:
+            queryset = queryset.filter(author__username=author)
+
+        topic = self.request.query_params.get('topic', '').strip()
+        if topic:
+            queryset = queryset.filter(
+                Q(category__slug__iexact=topic)
+                | Q(tags__slug__iexact=topic)
+                | Q(post_type__iexact=topic)
+            ).distinct()
+
+        ordering = self.request.query_params.get('ordering', 'newest')
+        if ordering == 'liked':
+            queryset = queryset.order_by('-likes', '-published_at', '-pk')
+        elif ordering == 'viewed':
+            queryset = queryset.order_by('-views', '-published_at', '-pk')
+        else:
+            queryset = queryset.order_by('-published_at', '-date_posted')
+
         return queryset
 
 
@@ -138,6 +158,11 @@ class PublicPostDetailView(RetrieveAPIView):
             .select_related('author', 'category')
             .prefetch_related('tags', 'blocks')
         )
+
+    def retrieve(self, request, *args, **kwargs):
+        post = self.get_object()
+        Post.objects.filter(pk=post.pk).update(views=F('views') + 1)
+        return Response(self.get_serializer(post).data)
 
 
 class CategoryListView(ListAPIView):

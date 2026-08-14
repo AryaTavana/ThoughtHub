@@ -58,18 +58,15 @@ export function AppNavbar() {
     }, [location.pathname, location.search])
 
     useEffect(() => {
+        if (location.pathname !== '/search') {
+            return
+        }
+
         const nextQuery = searchInput.trim()
         const currentQuery =
             new URLSearchParams(location.search).get('q') ?? ''
 
-        if (!nextQuery && location.pathname !== '/search') {
-            return
-        }
-
-        if (
-            location.pathname === '/search'
-            && nextQuery === currentQuery
-        ) {
+        if (nextQuery === currentQuery) {
             return
         }
 
@@ -145,7 +142,7 @@ export function AppNavbar() {
                             className={({isActive}) =>
                                 `app-nav-link ${isActive ? 'active' : ''}`
                             }
-                            to="/topics/technology"
+                            to="/topics"
                         >
                             Topics
                         </NavLink>
@@ -168,14 +165,14 @@ export function AppNavbar() {
                     >
                         <Icon icon={searchIcon} aria-hidden="true"/>
                         <label className="visually-hidden" htmlFor="navbar-search">
-                            Search posts, people, and topics
+                            Search published posts by title, author, or topic
                         </label>
                         <input
                             id="navbar-search"
                             type="search"
                             value={searchInput}
                             onChange={(event) => setSearchInput(event.target.value)}
-                            placeholder="Search posts, people, topics"
+                            placeholder="Search titles, authors, topics"
                         />
                     </form>
 
@@ -268,18 +265,18 @@ export function AppNavbar() {
                         >
                             <Icon icon={searchIcon} aria-hidden="true"/>
                             <label className="visually-hidden" htmlFor="mobile-navbar-search">
-                                Search posts, people, and topics
+                                Search published posts by title, author, or topic
                             </label>
                             <input
                                 id="mobile-navbar-search"
                                 type="search"
                                 value={searchInput}
                                 onChange={(event) => setSearchInput(event.target.value)}
-                                placeholder="Search ThoughtHub"
+                                placeholder="Search titles, authors, topics"
                             />
                         </form>
                         <NavLink to="/" end onClick={closeMenu}>Home</NavLink>
-                        <NavLink to="/topics/technology" onClick={closeMenu}>Topics</NavLink>
+                        <NavLink to="/topics" onClick={closeMenu}>Topics</NavLink>
                         {isAuthenticated ? (
                             <>
                                 <NavLink to="/dashboard" onClick={closeMenu}>Dashboard</NavLink>

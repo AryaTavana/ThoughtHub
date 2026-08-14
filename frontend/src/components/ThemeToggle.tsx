@@ -1,18 +1,26 @@
 import {Icon} from '@iconify/react'
 import moonIcon from '@iconify-icons/lucide/moon'
 import sunIcon from '@iconify-icons/lucide/sun'
-import {useState} from 'react'
+import {useEffect, useState} from 'react'
 
-import {applyTheme, type Theme} from '../theme'
-
-function getActiveTheme(): Theme {
-    return document.documentElement.dataset.theme === 'light'
-        ? 'light'
-        : 'dark'
-}
+import {
+    applyTheme,
+    getActiveTheme,
+    THEME_CHANGE_EVENT,
+    type Theme,
+} from '../theme'
 
 export function ThemeToggle() {
     const [theme, setTheme] = useState<Theme>(getActiveTheme)
+
+    useEffect(() => {
+        function syncTheme(event: Event) {
+            setTheme((event as CustomEvent<Theme>).detail)
+        }
+
+        window.addEventListener(THEME_CHANGE_EVENT, syncTheme)
+        return () => window.removeEventListener(THEME_CHANGE_EVENT, syncTheme)
+    }, [])
 
     const nextTheme: Theme = theme === 'dark' ? 'light' : 'dark'
 
@@ -23,7 +31,6 @@ export function ThemeToggle() {
             aria-label={`Use ${nextTheme} theme`}
             onClick={() => {
                 applyTheme(nextTheme)
-                setTheme(nextTheme)
             }}
         >
             <Icon

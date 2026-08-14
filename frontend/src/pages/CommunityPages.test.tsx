@@ -19,11 +19,20 @@ import {
 
 import type { NotificationItem } from '../api/notifications'
 import {
+  confirmPasswordReset,
+  getPublicUserProfile,
+  requestPasswordReset,
+} from '../api/auth'
+import { ApiError } from '../api/client'
+import {
+  getCategories,
   getPublishedPosts,
+  getTags,
   type PaginatedResponse,
   type PublicPostListItem,
 } from '../api/posts'
 import type { SavedPostRecord } from '../api/savedPosts'
+import { useAuth } from '../auth/useAuth'
 import {
   NotificationsContext,
   type NotificationsContextValue,
@@ -34,16 +43,39 @@ import {
 } from '../saved-posts-context'
 import {
   NotificationsPage,
+  HelpCenterPage,
+  PasswordRecoveryPage,
+  PublicProfilePage,
   SavedPostsPage,
   SearchPage,
+  TopicPage,
+  TopicsIndexPage,
 } from './CommunityPages'
 
 vi.mock('../api/posts', () => ({
+  getCategories: vi.fn(),
   getPublishedPosts: vi.fn(),
+  getTags: vi.fn(),
   getAuthorPost: vi.fn(),
 }))
 
+vi.mock('../api/auth', () => ({
+  confirmPasswordReset: vi.fn(),
+  getPublicUserProfile: vi.fn(),
+  requestPasswordReset: vi.fn(),
+}))
+
+vi.mock('../auth/useAuth', () => ({
+  useAuth: vi.fn(),
+}))
+
 const getPublishedPostsMock = vi.mocked(getPublishedPosts)
+const getCategoriesMock = vi.mocked(getCategories)
+const getTagsMock = vi.mocked(getTags)
+const getPublicUserProfileMock = vi.mocked(getPublicUserProfile)
+const requestPasswordResetMock = vi.mocked(requestPasswordReset)
+const confirmPasswordResetMock = vi.mocked(confirmPasswordReset)
+const useAuthMock = vi.mocked(useAuth)
 
 const djangoPost: PublicPostListItem = {
   id: 1,
@@ -86,6 +118,16 @@ function page(
 describe('live community features', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    useAuthMock.mockReturnValue({
+      user: null,
+      isAuthenticated: false,
+      isInitializing: false,
+      initializationError: null,
+      login: vi.fn(),
+      register: vi.fn(),
+      updateProfile: vi.fn(),
+      logout: vi.fn(),
+    })
   })
 
   it('searches the backend automatically while typing', async () => {
@@ -110,7 +152,9 @@ describe('live community features', () => {
     ).toBeInTheDocument()
 
     await user.type(
-      screen.getByRole('searchbox', { name: 'Search posts' }),
+      screen.getByRole('searchbox', {
+        name: 'Search published posts by title, author, or topic',
+      }),
       'Django',
     )
 
@@ -204,5 +248,147 @@ describe('live community features', () => {
       screen.getByRole('button', { name: 'Mark as read' }),
     )
     expect(markRead).toHaveBeenCalledWith(4)
+  })
+
+  it('returns a real not-found state for an unknown profile', async () => {
+    getPublicUserProfileMock.mockRejectedValue(
+      new ApiError('Not found.', 404, {detail: 'Not found.'}),
+    )
+    getPublishedPostsMock.mockResolvedValue(page([]))
+
+    render(
+      <MemoryRouter initialEntries={['/profile/missing-user']}>
+        <Routes>
+          <Route path="/profile/:username" element={<PublicProfilePage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(
+      await screen.findByRole('heading', {name: 'Profile not found'}),
+    ).toBeInTheDocument()
+    expect(getPublishedPostsMock).toHaveBeenCalledWith({
+      author: 'missing-user',
+      page: 1,
+    })
+  })
+
+  it('loads topic matches from the backend without unrelated fallbacks', async () => {
+    getPublishedPostsMock.mockResolvedValue(page([]))
+
+    render(
+      <MemoryRouter initialEntries={['/topics/missing-topic']}>
+        <Routes>
+          <Route path="/topics/:topic" element={<TopicPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(
+      await screen.findByRole('heading', {name: 'No posts in this topic'}),
+    ).toBeInTheDocument()
+    expect(getPublishedPostsMock).toHaveBeenCalledWith({
+      page: 1,
+      topic: 'missing-topic',
+    })
+    expect(
+      screen.queryByRole('link', {name: 'Learning Django'}),
+    ).not.toBeInTheDocument()
+  })
+
+  it('lists every category and tag in the topic directory', async () => {
+    getCategoriesMock.mockResolvedValue([
+      {id: 1, name: 'Development', slug: 'development'},
+    ])
+    getTagsMock.mockResolvedValue([
+      {id: 2, name: 'Testing', slug: 'testing'},
+    ])
+
+    render(<MemoryRouter><TopicsIndexPage /></MemoryRouter>)
+
+    expect(
+      await screen.findByRole('link', {name: /Development/}),
+    ).toHaveAttribute('href', '/topics/development')
+    expect(
+      screen.getByRole('link', {name: /#Testing/}),
+    ).toHaveAttribute('href', '/topics/testing')
+    expect(getCategoriesMock).toHaveBeenCalledOnce()
+    expect(getTagsMock).toHaveBeenCalledOnce()
+  })
+
+  it('requests a real one-use password reset link', async () => {
+    requestPasswordResetMock.mockResolvedValue({detail: 'Sent.'})
+    const user = userEvent.setup()
+
+    render(
+      <MemoryRouter initialEntries={['/password-recovery']}>
+        <Routes>
+          <Route path="/password-recovery" element={<PasswordRecoveryPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await user.type(
+      screen.getByRole('textbox', {name: 'Email address'}),
+      'arya@example.com',
+    )
+    await user.click(screen.getByRole('button', {name: 'Send reset link'}))
+
+    expect(requestPasswordResetMock).toHaveBeenCalledWith('arya@example.com')
+    expect(
+      await screen.findByRole('heading', {name: 'Check your inbox'}),
+    ).toBeInTheDocument()
+  })
+
+  it('confirms a password through the tokenized route', async () => {
+    confirmPasswordResetMock.mockResolvedValue({detail: 'Updated.'})
+    const user = userEvent.setup()
+
+    render(
+      <MemoryRouter initialEntries={['/password-recovery/Nw/token-123']}>
+        <Routes>
+          <Route
+            path="/password-recovery/:uid/:token"
+            element={<PasswordRecoveryPage />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await user.type(
+      screen.getByLabelText('New password'),
+      'StrongPassword456!',
+    )
+    await user.type(
+      screen.getByLabelText('Confirm new password'),
+      'StrongPassword456!',
+    )
+    await user.click(screen.getByRole('button', {name: 'Update password'}))
+
+    expect(confirmPasswordResetMock).toHaveBeenCalledWith({
+      uid: 'Nw',
+      token: 'token-123',
+      new_password: 'StrongPassword456!',
+      new_password_confirm: 'StrongPassword456!',
+    })
+    expect(
+      await screen.findByRole('heading', {name: 'Your new password is ready'}),
+    ).toBeInTheDocument()
+  })
+
+  it('filters help content as the user searches', async () => {
+    const user = userEvent.setup()
+    render(<MemoryRouter><HelpCenterPage /></MemoryRouter>)
+
+    await user.type(
+      screen.getByRole('searchbox', {name: 'Search help articles'}),
+      'password',
+    )
+
+    expect(screen.getByText('Account and profile')).toBeInTheDocument()
+    expect(screen.getByText('Why can’t I sign in?')).toBeInTheDocument()
+    expect(
+      screen.queryByText('Writing and publishing'),
+    ).not.toBeInTheDocument()
   })
 })

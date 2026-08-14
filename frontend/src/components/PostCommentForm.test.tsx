@@ -52,6 +52,7 @@ const signedOutAuth: AuthContextValue = {
   initializationError: null,
   login: vi.fn(),
   register: vi.fn(),
+  updateProfile: vi.fn(),
   logout: vi.fn(),
 }
 

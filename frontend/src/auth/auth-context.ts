@@ -2,6 +2,7 @@ import {createContext} from 'react'
 
 import type {
     CurrentUser,
+    CurrentUserUpdate,
     LoginCredentials,
     RegistrationData,
 } from '../api/auth'
@@ -14,6 +15,9 @@ export interface AuthContextValue {
     login: (credentials: LoginCredentials) => Promise<CurrentUser>
     register: (
         registrationData: RegistrationData,
+    ) => Promise<CurrentUser>
+    updateProfile: (
+        update: CurrentUserUpdate,
     ) => Promise<CurrentUser>
     logout: () => Promise<void>
 }

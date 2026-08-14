@@ -134,6 +134,7 @@ describe('DashboardPage', () => {
 
   it('shows a loading state while author posts are requested', () => {
     getAuthorPostsMock.mockReturnValue(new Promise(() => {}))
+    getAuthorCommentsMock.mockReturnValue(new Promise(() => {}))
 
     renderDashboard()
 

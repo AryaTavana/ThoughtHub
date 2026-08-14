@@ -51,6 +51,7 @@ function setAuthState(
     initializationError: null,
     login: loginMock,
     register: registerMock,
+    updateProfile: vi.fn(),
     logout: logoutMock,
     ...overrides,
   })

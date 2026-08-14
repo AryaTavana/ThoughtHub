@@ -10,8 +10,10 @@ import {
     login as loginRequest,
     logout as logoutRequest,
     register as registerRequest,
+    updateCurrentUser,
     type CurrentUser,
     type LoginCredentials,
+    type CurrentUserUpdate,
     type RegistrationData,
 } from '../api/auth'
 import {ApiError} from '../api/client'
@@ -112,6 +114,14 @@ export function AuthProvider({children}: AuthProviderProps) {
         setUser(null)
     }
 
+    async function updateProfile(
+        update: CurrentUserUpdate,
+    ): Promise<CurrentUser> {
+        const updatedUser = await updateCurrentUser(update)
+        setUser(updatedUser)
+        return updatedUser
+    }
+
     const contextValue: AuthContextValue = {
         user,
         isAuthenticated: user !== null,
@@ -119,6 +129,7 @@ export function AuthProvider({children}: AuthProviderProps) {
         initializationError,
         login,
         register,
+        updateProfile,
         logout,
     }
 

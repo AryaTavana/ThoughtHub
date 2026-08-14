@@ -7,11 +7,15 @@ import {
 } from 'vitest'
 
 import {
+  confirmPasswordReset,
   getCurrentUser,
+  getPublicUserProfile,
   initializeCsrf,
   login,
   logout,
   register,
+  requestPasswordReset,
+  updateCurrentUser,
   type CurrentUser,
   type LoginCredentials,
   type RegistrationData,
@@ -51,6 +55,39 @@ describe('authentication API service', () => {
 
     await expect(getCurrentUser()).resolves.toEqual(currentUser)
     expect(apiRequestMock).toHaveBeenCalledWith('/api/auth/me/')
+  })
+
+  it('updates editable account fields', async () => {
+    const update = {
+      email: 'updated@example.com',
+      first_name: 'Updated',
+      last_name: 'Author',
+    }
+    apiRequestMock.mockResolvedValue({...currentUser, ...update})
+
+    await updateCurrentUser(update)
+
+    expect(apiRequestMock).toHaveBeenCalledWith('/api/auth/me/', {
+      method: 'PATCH',
+      body: JSON.stringify(update),
+    })
+  })
+
+  it('loads a public profile using a safe URL segment', async () => {
+    const profile = {
+      username: 'آریا',
+      first_name: 'Arya',
+      last_name: 'Tavana',
+      published_posts_count: 2,
+      total_reading_time: 8,
+      topics_count: 3,
+    }
+    apiRequestMock.mockResolvedValue(profile)
+
+    await expect(getPublicUserProfile('آریا')).resolves.toEqual(profile)
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/api/auth/profiles/%D8%A2%D8%B1%DB%8C%D8%A7/',
+    )
   })
 
   it('sends login credentials as JSON', async () => {
@@ -100,6 +137,36 @@ describe('authentication API service', () => {
       '/api/auth/logout/',
       {
         method: 'POST',
+      },
+    )
+  })
+
+  it('requests and confirms a password reset', async () => {
+    apiRequestMock.mockResolvedValue({detail: 'Done.'})
+    const confirmation = {
+      uid: 'Nw',
+      token: 'one-use-token',
+      new_password: 'StrongPassword456!',
+      new_password_confirm: 'StrongPassword456!',
+    }
+
+    await requestPasswordReset('arya@example.com')
+    await confirmPasswordReset(confirmation)
+
+    expect(apiRequestMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/auth/password-reset/',
+      {
+        method: 'POST',
+        body: JSON.stringify({email: 'arya@example.com'}),
+      },
+    )
+    expect(apiRequestMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/auth/password-reset/confirm/',
+      {
+        method: 'POST',
+        body: JSON.stringify(confirmation),
       },
     )
   })

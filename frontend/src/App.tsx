@@ -27,6 +27,7 @@ import {
     SearchPage,
     SettingsPage,
     TopicPage,
+    TopicsIndexPage,
 } from './pages/CommunityPages'
 
 function NotFoundPage() {
@@ -48,8 +49,9 @@ function NotFoundPage() {
 function App() {
     return (
         <div className="app">
+            <a className="skip-link" href="#main-content">Skip to main content</a>
             <AppNavbar/>
-            <main>
+            <main id="main-content" tabIndex={-1}>
                 <Routes>
                     <Route path="/" element={<PublicPostsPage/>}/>
                     <Route
@@ -62,6 +64,10 @@ function App() {
                         element={<PasswordRecoveryPage/>}
                     />
                     <Route
+                        path="/password-recovery/:uid/:token"
+                        element={<PasswordRecoveryPage/>}
+                    />
+                    <Route
                         path="/register"
                         element={<RegistrationPage/>}
                     />
@@ -70,6 +76,7 @@ function App() {
                         element={<PublicProfilePage/>}
                     />
                     <Route path="/search" element={<SearchPage/>}/>
+                    <Route path="/topics" element={<TopicsIndexPage/>}/>
                     <Route path="/topics/:topic" element={<TopicPage/>}/>
                     <Route
                         path="/guidelines"

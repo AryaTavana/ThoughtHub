@@ -7,7 +7,7 @@ import graduationCapIcon from '@iconify-icons/lucide/graduation-cap'
 import heartIcon from '@iconify-icons/lucide/heart'
 import penLineIcon from '@iconify-icons/lucide/pen-line'
 import sparklesIcon from '@iconify-icons/lucide/sparkles'
-import {useEffect, useMemo, useState} from 'react'
+import {useEffect, useState} from 'react'
 import {Link} from 'react-router-dom'
 
 import {getApiErrorMessage} from '../api/errors'
@@ -38,7 +38,7 @@ export function PublicPostsPage() {
     const [isLoading, setIsLoading] = useState(true)
     const [loadError, setLoadError] = useState<string | null>(null)
     const [discoveryMode, setDiscoveryMode] =
-        useState<'newest' | 'liked' | 'viewed'>('newest')
+        useState<'newest' | 'viewed'>('newest')
 
     useEffect(() => {
         let isCancelled = false
@@ -49,7 +49,12 @@ export function PublicPostsPage() {
             setPostsPage(null)
 
             try {
-                const response = await getPublishedPosts({page})
+                const response = await getPublishedPosts({
+                    page,
+                    ...(discoveryMode === 'newest'
+                        ? {}
+                        : {ordering: discoveryMode}),
+                })
                 if (!isCancelled) setPostsPage(response)
             } catch (error) {
                 if (!isCancelled) {
@@ -67,22 +72,7 @@ export function PublicPostsPage() {
 
         void loadPosts()
         return () => { isCancelled = true }
-    }, [page, reloadKey])
-
-    const visiblePosts = useMemo(() => {
-        const posts = postsPage?.results ?? []
-        if (discoveryMode === 'liked') {
-            return [...posts].sort((first, second) =>
-                second.tags.length - first.tags.length,
-            )
-        }
-        if (discoveryMode === 'viewed') {
-            return [...posts].sort((first, second) =>
-                second.reading_time - first.reading_time,
-            )
-        }
-        return posts
-    }, [discoveryMode, postsPage])
+    }, [discoveryMode, page, reloadKey])
 
     const topics = Array.from(
         new Map(
@@ -154,9 +144,8 @@ export function PublicPostsPage() {
                     </div>
 
                     <div className="discovery-tabs" aria-label="Sort published posts">
-                        <button type="button" aria-pressed={discoveryMode === 'newest'} onClick={() => setDiscoveryMode('newest')}><Icon icon={clockIcon} aria-hidden="true"/>Newest</button>
-                        <button type="button" aria-pressed={discoveryMode === 'liked'} onClick={() => setDiscoveryMode('liked')}><Icon icon={heartIcon} aria-hidden="true"/>Most liked</button>
-                        <button type="button" aria-pressed={discoveryMode === 'viewed'} onClick={() => setDiscoveryMode('viewed')}><Icon icon={eyeIcon} aria-hidden="true"/>Most viewed</button>
+                        <button type="button" aria-pressed={discoveryMode === 'newest'} onClick={() => {setPage(1); setDiscoveryMode('newest')}}><Icon icon={clockIcon} aria-hidden="true"/>Newest</button>
+                        <button type="button" aria-pressed={discoveryMode === 'viewed'} onClick={() => {setPage(1); setDiscoveryMode('viewed')}}><Icon icon={eyeIcon} aria-hidden="true"/>Most viewed</button>
                     </div>
 
                     {isLoading && (
@@ -186,7 +175,7 @@ export function PublicPostsPage() {
                         <>
                             <h3 className="visually-hidden">Latest posts</h3>
                             <div className="post-card-grid">
-                                {visiblePosts.map((post, index) => (
+                                {postsPage.results.map((post, index) => (
                                     <article className={`post-card ${index === 0 ? 'post-card--featured' : ''}`} key={post.id}>
                                         <div className="post-card__media">
                                             {post.featured_image ? (
@@ -229,14 +218,14 @@ export function PublicPostsPage() {
             <section className="home-topics">
                 <div className="app-shell">
                     <div className="section-heading">
-                        <div><p className="section-eyebrow">Follow your curiosity</p><h2>Popular topics</h2></div>
-                        <Link className="quiet-link" to="/topics/technology">View topics <Icon icon={arrowRightIcon} aria-hidden="true"/></Link>
+                        <div><p className="section-eyebrow">Topics in this feed</p><h2>Explore these topics</h2></div>
+                        <Link className="quiet-link" to="/topics">View all topics <Icon icon={arrowRightIcon} aria-hidden="true"/></Link>
                     </div>
-                    <div className="topic-link-grid">
-                        {(topics.length > 0 ? topics : [['technology', 'Technology'], ['university-life', 'University life'], ['learning', 'Learning']]).map(([slug, name], index) => (
+                    {topics.length > 0 && <div className="topic-link-grid">
+                        {topics.map(([slug, name], index) => (
                             <Link to={`/topics/${slug}`} key={slug}><span>{String(index + 1).padStart(2, '0')}</span><strong>{name} thoughts</strong><Icon icon={arrowRightIcon} aria-hidden="true"/></Link>
                         ))}
-                    </div>
+                    </div>}
                 </div>
             </section>
 

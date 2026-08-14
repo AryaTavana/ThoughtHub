@@ -242,6 +242,22 @@ describe('published posts API service', () => {
     )
   })
 
+  it('encodes public discovery filters and server ordering', async () => {
+    apiRequestMock.mockResolvedValue(firstPage)
+
+    await getPublishedPosts({
+      page: 2,
+      search: '  Django API  ',
+      author: '  arya  ',
+      topic: 'rest-api',
+      ordering: 'viewed',
+    })
+
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      '/api/posts/?page=2&search=Django+API&author=arya&topic=rest-api&ordering=viewed',
+    )
+  })
+
   it('preserves nested post, category, and tag data', async () => {
     apiRequestMock.mockResolvedValue(firstPage)
 

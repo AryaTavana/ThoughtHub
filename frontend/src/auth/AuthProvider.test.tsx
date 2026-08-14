@@ -14,6 +14,7 @@ import {
   login,
   logout,
   register,
+  updateCurrentUser,
   type CurrentUser,
   type LoginCredentials,
   type RegistrationData,
@@ -28,6 +29,7 @@ vi.mock('../api/auth', () => ({
   login: vi.fn(),
   logout: vi.fn(),
   register: vi.fn(),
+  updateCurrentUser: vi.fn(),
 }))
 
 const getCurrentUserMock = vi.mocked(getCurrentUser)
@@ -35,6 +37,7 @@ const initializeCsrfMock = vi.mocked(initializeCsrf)
 const loginMock = vi.mocked(login)
 const logoutMock = vi.mocked(logout)
 const registerMock = vi.mocked(register)
+const updateCurrentUserMock = vi.mocked(updateCurrentUser)
 
 const currentUser: CurrentUser = {
   id: 7,
@@ -57,6 +60,12 @@ const registrationData: RegistrationData = {
   password_confirm: 'StrongPassword123!',
 }
 
+const profileUpdate = {
+  email: 'updated@example.com',
+  first_name: 'Updated',
+  last_name: 'Author',
+}
+
 function AuthStateProbe() {
   const auth = useAuth()
 
@@ -65,6 +74,7 @@ function AuthStateProbe() {
       <p>{auth.isInitializing ? 'Initializing' : 'Ready'}</p>
       <p>{auth.isAuthenticated ? 'Authenticated' : 'Signed out'}</p>
       <p>{auth.user?.username ?? 'No current user'}</p>
+      <p>{auth.user?.email ?? 'No current email'}</p>
       <p>{auth.initializationError ?? 'No initialization error'}</p>
 
       <button
@@ -90,6 +100,14 @@ function AuthStateProbe() {
         }}
       >
         Log out
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          void auth.updateProfile(profileUpdate)
+        }}
+      >
+        Update profile
       </button>
     </div>
   )
@@ -214,6 +232,24 @@ describe('AuthProvider', () => {
     })
     expect(screen.getByText('No current user')).toBeInTheDocument()
     expect(logoutMock).toHaveBeenCalledOnce()
+  })
+
+  it('stores profile updates returned by the API', async () => {
+    getCurrentUserMock.mockResolvedValue(currentUser)
+    const updatedUser = {...currentUser, ...profileUpdate}
+    updateCurrentUserMock.mockResolvedValue(updatedUser)
+    const user = userEvent.setup()
+    renderProvider()
+    await screen.findByText(currentUser.username)
+
+    await user.click(
+      screen.getByRole('button', {name: 'Update profile'}),
+    )
+
+    expect(
+      await screen.findByText(updatedUser.email),
+    ).toBeInTheDocument()
+    expect(updateCurrentUserMock).toHaveBeenCalledWith(profileUpdate)
   })
 })
 

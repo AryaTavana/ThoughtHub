@@ -1,11 +1,21 @@
 export type Theme = 'dark' | 'light'
 
 const THEME_STORAGE_KEY = 'thoughthub-theme'
+export const THEME_CHANGE_EVENT = 'thoughthub-theme-change'
+
+export function getActiveTheme(): Theme {
+    return document.documentElement.dataset.theme === 'light'
+        ? 'light'
+        : 'dark'
+}
 
 export function applyTheme(theme: Theme, persist = true) {
     document.documentElement.dataset.theme = theme
     document.documentElement.dataset.bsTheme = theme
     document.documentElement.style.colorScheme = theme
+    window.dispatchEvent(new CustomEvent<Theme>(THEME_CHANGE_EVENT, {
+        detail: theme,
+    }))
 
     if (!persist) {
         return

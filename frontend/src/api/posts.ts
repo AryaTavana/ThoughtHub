@@ -164,6 +164,9 @@ export interface PublicPostDetail
 export interface PublishedPostListParameters {
     page?: number
     search?: string
+    author?: string
+    topic?: string
+    ordering?: 'newest' | 'liked' | 'viewed'
 }
 
 export function getPublishedPosts(
@@ -177,6 +180,18 @@ export function getPublishedPosts(
 
     if (parameters.search?.trim()) {
         searchParameters.set('search', parameters.search.trim())
+    }
+
+    if (parameters.author?.trim()) {
+        searchParameters.set('author', parameters.author.trim())
+    }
+
+    if (parameters.topic?.trim()) {
+        searchParameters.set('topic', parameters.topic.trim())
+    }
+
+    if (parameters.ordering && parameters.ordering !== 'newest') {
+        searchParameters.set('ordering', parameters.ordering)
     }
 
     const queryString = searchParameters.toString()

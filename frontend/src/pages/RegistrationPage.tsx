@@ -123,9 +123,9 @@ export function RegistrationPage() {
 
     if (isInitializing) {
         return (
-            <main className="content-state app-shell">
+            <section className="content-state app-shell">
                 <p role="status">Checking your account...</p>
-            </main>
+            </section>
         )
     }
 
@@ -134,7 +134,7 @@ export function RegistrationPage() {
     }
 
     return (
-        <main className="auth-page auth-page--registration app-shell">
+        <section className="auth-page auth-page--registration app-shell">
             <aside className="auth-welcome">
                 <div>
                     <p className="section-eyebrow">Join ThoughtHub</p>
@@ -438,6 +438,6 @@ export function RegistrationPage() {
                     </div>
                 </div>
             </div>
-        </main>
+        </section>
     )
 }

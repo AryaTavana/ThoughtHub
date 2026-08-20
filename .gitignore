@@ -18,6 +18,7 @@ deploy/oracle/oracle.env
 deploy/alwaysdata/alwaysdata.env
 deploy/alwaysdata/account-credentials.env
 deploy/alwaysdata/admin-credentials.env
+deploy/alwaysdata/mail-credentials.env
 backups/
 
 # Python

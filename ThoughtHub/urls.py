@@ -17,14 +17,31 @@ Including another URLconf
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import path, include
+from django.http import JsonResponse
+from django.urls import include, path, re_path
+from django.views.generic import TemplateView
+
+
+def health_check(request):
+    return JsonResponse({'status': 'ok'})
 
 urlpatterns = [
+    path('healthz/', health_check, name='health-check'),
     path('admin/', admin.site.urls),
     path('api/', include('Blog.urls')),
     path('api/auth/', include('Account.urls')),
-
 ]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# The production image contains the Vite build. Let React Router handle all
+# non-backend routes while preserving real 404 responses below /api and /admin.
+if settings.FRONTEND_INDEX.exists():
+    urlpatterns += [
+        re_path(
+            r'^(?!api(?:/|$)|admin(?:/|$)|static(?:/|$)|media(?:/|$)).*$',
+            TemplateView.as_view(template_name='index.html'),
+            name='frontend',
+        ),
+    ]

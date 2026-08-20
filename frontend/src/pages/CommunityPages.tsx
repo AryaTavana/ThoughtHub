@@ -2,19 +2,26 @@ import {Icon} from '@iconify/react'
 import arrowLeftIcon from '@iconify-icons/lucide/arrow-left'
 import arrowRightIcon from '@iconify-icons/lucide/arrow-right'
 import bookmarkIcon from '@iconify-icons/lucide/bookmark'
+import bookOpenIcon from '@iconify-icons/lucide/book-open'
 import checkIcon from '@iconify-icons/lucide/check'
+import clockIcon from '@iconify-icons/lucide/clock-3'
 import codeIcon from '@iconify-icons/lucide/code-2'
 import compassIcon from '@iconify-icons/lucide/compass'
-import cpuIcon from '@iconify-icons/lucide/cpu'
 import graduationCapIcon from '@iconify-icons/lucide/graduation-cap'
 import keyRoundIcon from '@iconify-icons/lucide/key-round'
+import layersIcon from '@iconify-icons/lucide/layers-3'
 import lifeBuoyIcon from '@iconify-icons/lucide/life-buoy'
 import lockIcon from '@iconify-icons/lucide/lock-keyhole'
 import mailIcon from '@iconify-icons/lucide/mail'
 import messageIcon from '@iconify-icons/lucide/message-circle'
+import moonIcon from '@iconify-icons/lucide/moon'
+import paletteIcon from '@iconify-icons/lucide/palette'
 import penLineIcon from '@iconify-icons/lucide/pen-line'
 import searchIcon from '@iconify-icons/lucide/search'
+import shapesIcon from '@iconify-icons/lucide/shapes'
 import shieldCheckIcon from '@iconify-icons/lucide/shield-check'
+import sparklesIcon from '@iconify-icons/lucide/sparkles'
+import sunIcon from '@iconify-icons/lucide/sun'
 import tagIcon from '@iconify-icons/lucide/tag'
 import userIcon from '@iconify-icons/lucide/user'
 import usersIcon from '@iconify-icons/lucide/users'
@@ -48,6 +55,7 @@ import {
     THEME_CHANGE_EVENT,
     type Theme,
 } from '../theme'
+import {getTextDirection} from '../textDirection'
 import {useSavedPosts} from '../useSavedPosts'
 import {useNotifications} from '../useNotifications'
 
@@ -62,11 +70,28 @@ function LoadingState({label}: {label: string}) {
     return <div className="content-state" role="status"><span className="loading-ring" aria-hidden="true"/><p>{label}</p></div>
 }
 
-function PostRows({posts}: {posts: PublicPostListItem[]}) {
+function PostRows({
+    posts,
+    appearance = 'rows',
+}: {
+    posts: PublicPostListItem[]
+    appearance?: 'rows' | 'profile' | 'collection'
+}) {
+    const hasMedia = appearance === 'profile' || appearance === 'collection'
+
     return (
-        <div className="post-row-list">
+        <div className={`post-row-list post-row-list--${appearance}`}>
             {posts.map((post) => (
                 <article className="post-row" key={post.id}>
+                    {hasMedia && (
+                        <Link className="post-row__media" to={`/posts/${post.slug}`} tabIndex={-1} aria-hidden="true">
+                            {post.featured_image ? (
+                                <img src={post.featured_image} alt=""/>
+                            ) : (
+                                <span><Icon icon={penLineIcon}/><small>{post.post_type.replaceAll('_', ' ')}</small></span>
+                            )}
+                        </Link>
+                    )}
                     <div className="post-row__content">
                         <div className="post-row__topline">
                             {post.category ? (
@@ -90,8 +115,13 @@ function PostRows({posts}: {posts: PublicPostListItem[]}) {
                                 }}
                             />
                         </div>
-                        <h2><Link to={`/posts/${post.slug}`}>{post.title}</Link></h2>
-                        {post.excerpt && <p>{post.excerpt}</p>}
+                        <h2 dir={getTextDirection(post.title)}><Link to={`/posts/${post.slug}`}>{post.title}</Link></h2>
+                        {post.excerpt && <p dir={getTextDirection(post.excerpt)}>{post.excerpt}</p>}
+                        {appearance === 'collection' && post.tags.length > 0 && (
+                            <div className="collection-post-tags">
+                                {post.tags.slice(0, 3).map((tag) => <Link to={`/tags/${tag.slug}`} key={tag.id}>#{tag.name}</Link>)}
+                            </div>
+                        )}
                         <div className="post-meta-line">
                             <span>By {post.author_username ?? 'Deleted user'}</span>
                             <span>{post.reading_time} min read</span>
@@ -174,34 +204,67 @@ export function PublicProfilePage() {
     return (
         <section className="app-shell community-page profile-page">
             <header className="profile-hero">
-                <div className="profile-avatar" aria-hidden="true">{initials || 'TH'}</div>
-                <div className="profile-hero__content">
-                    <div className="page-heading-with-action">
-                        <div>
-                            <h1>{displayName}</h1>
-                            <p className="profile-handle">@{username}</p>
-                        </div>
-                        {isOwnProfile && <Link className="button button--secondary" to="/settings">Edit profile</Link>}
+                <div className="profile-hero__identity">
+                    <div className="profile-hero__avatar" aria-hidden="true">
+                        <span>{initials || 'TH'}</span>
+                        <Icon icon={penLineIcon}/>
                     </div>
-                    <p className="profile-bio">A ThoughtHub author sharing ideas and useful perspectives with the community.</p>
-                    <div className="profile-details">
-                        <span><Icon icon={graduationCapIcon} aria-hidden="true"/> ThoughtHub author</span>
-                        <span><Icon icon={penLineIcon} aria-hidden="true"/> {profile.published_posts_count} published {profile.published_posts_count === 1 ? 'post' : 'posts'}</span>
+                    <div className="profile-hero__content">
+                        <p className="section-eyebrow"><Icon icon={graduationCapIcon} aria-hidden="true"/>Community author</p>
+                        <h1>{displayName}</h1>
+                        <p className="profile-handle">@{username}</p>
+                        <p className="profile-bio">Exploring ideas and sharing useful perspectives with the ThoughtHub community.</p>
+                        <div className="profile-details">
+                            <span><Icon icon={penLineIcon} aria-hidden="true"/> {profile.published_posts_count} published {profile.published_posts_count === 1 ? 'story' : 'stories'}</span>
+                            <span><Icon icon={tagIcon} aria-hidden="true"/> Writing across {profile.categories_count} {profile.categories_count === 1 ? 'category' : 'categories'}</span>
+                        </div>
+                        <div className="profile-hero__actions">
+                            <a className="button button--primary" href="#published-stories">Explore writing <Icon icon={arrowRightIcon} aria-hidden="true"/></a>
+                            {isOwnProfile && <Link className="button button--secondary" to="/settings"><Icon icon={userIcon} aria-hidden="true"/>Edit profile</Link>}
+                        </div>
                     </div>
                 </div>
+
+                <aside className="profile-impact" aria-label="Author contribution summary">
+                    <div className="profile-impact__heading">
+                        <div className="profile-impact__mark" aria-hidden="true"><Icon icon={compassIcon}/></div>
+                        <div><p>Contribution snapshot</p><h2>Ideas in motion</h2></div>
+                    </div>
+                    <p className="profile-impact__intro">A quick look at {displayName.split(' ')[0]}’s published work and the ground it covers.</p>
+                    <dl className="profile-impact__stats">
+                        <div className="profile-impact__stat profile-impact__stat--featured">
+                            <dt><Icon icon={clockIcon} aria-hidden="true"/>Reading time</dt>
+                            <dd>{profile.total_reading_time}<small>minutes</small></dd>
+                        </div>
+                        <div className="profile-impact__stat">
+                            <dt>Stories</dt>
+                            <dd>{profile.published_posts_count}</dd>
+                        </div>
+                        <div className="profile-impact__stat">
+                            <dt>Categories</dt>
+                            <dd>{profile.categories_count}</dd>
+                        </div>
+                        <div className="profile-impact__stat">
+                            <dt>Topics</dt>
+                            <dd>{profile.tags_count}</dd>
+                        </div>
+                    </dl>
+                </aside>
             </header>
 
-            <div className="profile-stats" aria-label="Profile activity">
-                <div><strong>{profile.published_posts_count}</strong><span>Posts</span></div>
-                <div><strong>{profile.total_reading_time}</strong><span>Minutes of reading</span></div>
-                <div><strong>{profile.categories_count}</strong><span>Categories</span></div>
-                <div><strong>{profile.tags_count}</strong><span>Tags</span></div>
-            </div>
-
-            <div className="section-heading"><div><p className="section-eyebrow">Latest writing</p><h2>Posts by {displayName}</h2></div></div>
-            {postsPage.results.length > 0 ? <><PostRows posts={postsPage.results}/>{(postsPage.previous || postsPage.next) && <nav className="pagination-bar" aria-label="Profile post pages"><button className="button button--secondary" type="button" disabled={!postsPage.previous} onClick={() => setPageState({username, page: Math.max(1, page - 1)})}>Previous</button><span>Page {page}</span><button className="button button--secondary" type="button" disabled={!postsPage.next} onClick={() => setPageState({username, page: page + 1})}>Next</button></nav>}</> : (
-                <div className="empty-state"><Icon icon={penLineIcon} aria-hidden="true"/><h2>No published posts yet</h2><p>When {displayName} publishes a thought, it will appear here.</p>{isOwnProfile && <Link className="button button--primary" to="/dashboard/posts/new">Write your first post</Link>}</div>
-            )}
+            <section className="profile-writing" id="published-stories" aria-labelledby="published-stories-heading">
+                <header className="profile-writing__header">
+                    <div>
+                        <p className="section-eyebrow"><Icon icon={penLineIcon} aria-hidden="true"/>Published stories</p>
+                        <h2 id="published-stories-heading">Writing by {displayName}</h2>
+                        <p>Ideas, observations, and practical lessons shared with the community.</p>
+                    </div>
+                    <span>{postsPage.count} {postsPage.count === 1 ? 'story' : 'stories'}</span>
+                </header>
+                {postsPage.results.length > 0 ? <><PostRows posts={postsPage.results} appearance="profile"/>{(postsPage.previous || postsPage.next) && <nav className="pagination-bar" aria-label="Profile post pages"><button className="button button--secondary" type="button" disabled={!postsPage.previous} onClick={() => setPageState({username, page: Math.max(1, page - 1)})}>Previous</button><span>Page {page}</span><button className="button button--secondary" type="button" disabled={!postsPage.next} onClick={() => setPageState({username, page: page + 1})}>Next</button></nav>}</> : (
+                    <div className="empty-state profile-writing__empty"><Icon icon={penLineIcon} aria-hidden="true"/><h2>No published stories yet</h2><p>When {displayName} publishes a thought, it will appear here.</p>{isOwnProfile && <Link className="button button--primary" to="/dashboard/posts/new">Write your first post</Link>}</div>
+                )}
+            </section>
         </section>
     )
 }
@@ -213,6 +276,7 @@ function ClassificationPage({kind}: {kind: ClassificationKind}) {
     const slug = parameters[kind] ?? ''
     const [postsPage, setPostsPage] = useState<Awaited<ReturnType<typeof getPublishedPosts>> | null>(null)
     const [classification, setClassification] = useState<Category | Tag | null>(null)
+    const [classificationChoices, setClassificationChoices] = useState<(Category | Tag)[]>([])
     const [pageState, setPageState] = useState({slug, page: 1})
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -245,6 +309,7 @@ function ClassificationPage({kind}: {kind: ClassificationKind}) {
                     setClassification(
                         choices.find((choice) => choice.slug === slug) ?? null,
                     )
+                    setClassificationChoices(choices)
                 }
             } catch (loadError) {
                 if (!cancelled) setError(getApiErrorMessage(loadError, `Unable to load this ${kind}.`))
@@ -257,14 +322,57 @@ function ClassificationPage({kind}: {kind: ClassificationKind}) {
         return () => { cancelled = true }
     }, [kind, page, slug])
 
+    const relatedClassifications = classificationChoices
+        .filter((choice) => choice.slug !== slug)
+        .slice(0, 6)
+    const collectionNumber = Math.max(
+        1,
+        classificationChoices.findIndex((choice) => choice.slug === slug) + 1,
+    )
+    const resultCount = postsPage?.count ?? 0
+
     return (
         <section className="app-shell community-page classification-page">
-            <header className="classification-hero">
-                <div className="classification-hero__icon"><Icon icon={kind === 'category' ? cpuIcon : tagIcon} aria-hidden="true"/></div>
-                <div><p className="section-eyebrow">{kindLabel}</p><h1>{label}</h1><p>{kind === 'category' && classification && 'description' in classification && classification.description ? classification.description : `Published posts filed under this ${kind}.`}</p><div className="classification-hero__meta"><span>{postsPage?.count ?? 0} matching posts</span><span>Updated with the latest writing</span></div></div>
+            <nav className="taxonomy-breadcrumb" aria-label="Breadcrumb">
+                <Link to="/categories"><Icon icon={arrowLeftIcon} aria-hidden="true"/> Categories &amp; tags</Link>
+                <span aria-hidden="true">/</span>
+                <span>{kindLabel}</span>
+            </nav>
+
+            <header className={`taxonomy-detail-hero taxonomy-detail-hero--${kind}`}>
+                <div className="taxonomy-detail-hero__content">
+                    <div className="taxonomy-detail-hero__icon"><Icon icon={kind === 'category' ? layersIcon : tagIcon} aria-hidden="true"/></div>
+                    <div>
+                        <p className="section-eyebrow">{kind === 'category' ? 'Subject collection' : 'Topic trail'}</p>
+                        <h1>{kind === 'tag' && <span aria-hidden="true">#</span>}{label}</h1>
+                        <p>{kind === 'category' && classification && 'description' in classification && classification.description ? classification.description : `Ideas, perspectives, and practical writing connected by this ${kind}.`}</p>
+                    </div>
+                </div>
+                <aside className="taxonomy-detail-hero__summary" aria-label={`${kindLabel} summary`}>
+                    <span className="taxonomy-detail-hero__number">{String(collectionNumber).padStart(2, '0')}</span>
+                    <div>
+                        <strong>{resultCount}</strong>
+                        <span>{resultCount === 1 ? 'published story' : 'published stories'}</span>
+                    </div>
+                    <p>Fresh writing is added here whenever an author publishes under this {kind}.</p>
+                </aside>
             </header>
-            <div className="content-toolbar"><p>Newest matching posts</p><Link to="/categories" className="quiet-link"><Icon icon={arrowLeftIcon} aria-hidden="true"/> All categories and tags</Link></div>
-            {isLoading && !postsPage ? <LoadingState label={`Loading ${kind} posts…`}/> : error ? <div className="app-alert app-alert--danger" role="alert">{error}</div> : !classification ? <div className="empty-state"><Icon icon={searchIcon} aria-hidden="true"/><h2>{kindLabel} not found</h2><p>This {kind} does not exist in the backend catalogue.</p><Link className="button button--secondary" to="/categories">Browse categories and tags</Link></div> : postsPage && postsPage.results.length > 0 ? <><PostRows posts={postsPage.results}/>{(postsPage.previous || postsPage.next) && <nav className="pagination-bar" aria-label={`${kindLabel} post pages`}><button className="button button--secondary" type="button" disabled={!postsPage.previous} onClick={() => setPageState({slug, page: Math.max(1, page - 1)})}>Previous</button><span>Page {page}</span><button className="button button--secondary" type="button" disabled={!postsPage.next} onClick={() => setPageState({slug, page: page + 1})}>Next</button></nav>}</> : <div className="empty-state"><Icon icon={searchIcon} aria-hidden="true"/><h2>No posts in this {kind}</h2><p>Browse another category or tag, or search all published writing.</p><Link className="button button--secondary" to="/search">Search ThoughtHub</Link></div>}
+
+            <div className="taxonomy-detail-layout">
+                <section className="taxonomy-results" aria-labelledby="taxonomy-results-heading">
+                    <header className="taxonomy-results__header">
+                        <div><p className="section-eyebrow"><Icon icon={bookOpenIcon} aria-hidden="true"/>Latest writing</p><h2 id="taxonomy-results-heading">Stories in this {kind}</h2></div>
+                        <span>{resultCount} {resultCount === 1 ? 'story' : 'stories'}</span>
+                    </header>
+                    {isLoading && !postsPage ? <LoadingState label={`Loading ${kind} posts…`}/> : error ? <div className="app-alert app-alert--danger" role="alert">{error}</div> : !classification ? <div className="empty-state taxonomy-results__empty"><Icon icon={searchIcon} aria-hidden="true"/><h2>{kindLabel} not found</h2><p>This {kind} does not exist in the backend catalogue.</p><Link className="button button--secondary" to="/categories">Browse categories and tags</Link></div> : postsPage && postsPage.results.length > 0 ? <><PostRows posts={postsPage.results} appearance="collection"/>{(postsPage.previous || postsPage.next) && <nav className="pagination-bar" aria-label={`${kindLabel} post pages`}><button className="button button--secondary" type="button" disabled={!postsPage.previous} onClick={() => setPageState({slug, page: Math.max(1, page - 1)})}>Previous</button><span>Page {page}</span><button className="button button--secondary" type="button" disabled={!postsPage.next} onClick={() => setPageState({slug, page: page + 1})}>Next</button></nav>}</> : <div className="empty-state taxonomy-results__empty"><Icon icon={searchIcon} aria-hidden="true"/><h2>No posts in this {kind}</h2><p>Browse another category or tag, or search all published writing.</p><Link className="button button--secondary" to="/search">Search ThoughtHub</Link></div>}
+                </section>
+
+                <aside className="taxonomy-related" aria-label={`More ${kind === 'category' ? 'categories' : 'tags'}`}>
+                    <div className="taxonomy-related__heading"><div className="taxonomy-related__icon"><Icon icon={kind === 'category' ? shapesIcon : sparklesIcon} aria-hidden="true"/></div><div><p>Keep exploring</p><h2>More {kind === 'category' ? 'categories' : 'topics'}</h2></div></div>
+                    {relatedClassifications.length > 0 ? <div className="taxonomy-related__links">{relatedClassifications.map((choice) => <Link to={`/${kind === 'category' ? 'categories' : 'tags'}/${choice.slug}`} key={choice.id}><span>{kind === 'tag' && '#'}{choice.name}</span><Icon icon={arrowRightIcon} aria-hidden="true"/></Link>)}</div> : <p className="taxonomy-related__empty">More paths will appear as the catalogue grows.</p>}
+                    <Link className="taxonomy-related__all" to="/categories">View the full idea map <Icon icon={arrowRightIcon} aria-hidden="true"/></Link>
+                </aside>
+            </div>
         </section>
     )
 }
@@ -308,12 +416,40 @@ export function CategoriesTagsPage() {
 
     return (
         <section className="app-shell community-page classifications-index-page">
-            <header className="page-intro"><div><p className="section-eyebrow">Explore ThoughtHub</p><h1>Categories and tags</h1><p>Browse the same categories and tags authors select when publishing.</p></div></header>
+            <header className="taxonomy-index-hero">
+                <div className="taxonomy-index-hero__content">
+                    <p className="section-eyebrow"><Icon icon={compassIcon} aria-hidden="true"/>Explore ThoughtHub</p>
+                    <h1 aria-label="Categories and tags">Follow an idea.<br/><span>Find your next thought.</span></h1>
+                    <p>Start with a broad subject or follow a precise topic trail through writing from the ThoughtHub community.</p>
+                    <nav className="taxonomy-index-hero__actions" aria-label="Jump to a section">
+                        <a href="#categories"><Icon icon={layersIcon} aria-hidden="true"/> Browse categories</a>
+                        <a href="#tags"><Icon icon={tagIcon} aria-hidden="true"/> Explore tags</a>
+                    </nav>
+                </div>
+                <div className="taxonomy-map" aria-hidden="true">
+                    <div className="taxonomy-map__orbit taxonomy-map__orbit--outer"/>
+                    <div className="taxonomy-map__orbit taxonomy-map__orbit--inner"/>
+                    <div className="taxonomy-map__core"><Icon icon={sparklesIcon}/></div>
+                    <span className="taxonomy-map__node taxonomy-map__node--one"><Icon icon={layersIcon}/></span>
+                    <span className="taxonomy-map__node taxonomy-map__node--two"><Icon icon={tagIcon}/></span>
+                    <span className="taxonomy-map__node taxonomy-map__node--three"><Icon icon={bookOpenIcon}/></span>
+                </div>
+                {classifications && <dl className="taxonomy-index-hero__stats">
+                    <div><dt>Subjects</dt><dd>{classifications.categories.length}</dd></div>
+                    <div><dt>Topic trails</dt><dd>{classifications.tags.length}</dd></div>
+                </dl>}
+            </header>
             {!classifications && !error && <LoadingState label="Loading categories and tags…"/>}
             {error && <div className="app-alert app-alert--danger" role="alert">{error}</div>}
             {classifications && <>
-                <section className="classification-index-section"><div className="section-heading"><div><p className="section-eyebrow">Broad subjects</p><h2>Categories</h2></div><span className="post-count">{classifications.categories.length} {classifications.categories.length === 1 ? 'category' : 'categories'}</span></div><div className="classification-link-grid">{classifications.categories.map((category, index) => <Link to={`/categories/${category.slug}`} key={category.id}><span>{String(index + 1).padStart(2, '0')}</span><div><strong>{category.name}</strong>{category.description && <small>{category.description}</small>}</div><Icon icon={arrowRightIcon} aria-hidden="true"/></Link>)}</div></section>
-                <section className="classification-index-section"><div className="section-heading"><div><p className="section-eyebrow">Specific ideas</p><h2>Tags</h2></div><span className="post-count">{classifications.tags.length} {classifications.tags.length === 1 ? 'tag' : 'tags'}</span></div><div className="classification-link-grid">{classifications.tags.map((tag, index) => <Link to={`/tags/${tag.slug}`} key={tag.id}><span>{String(index + 1).padStart(2, '0')}</span><div><strong>#{tag.name}</strong></div><Icon icon={arrowRightIcon} aria-hidden="true"/></Link>)}</div></section>
+                <section className="taxonomy-index-section" id="categories" aria-labelledby="categories-heading">
+                    <header className="taxonomy-index-section__heading"><div className="taxonomy-index-section__intro"><span><Icon icon={layersIcon} aria-hidden="true"/></span><div><p className="section-eyebrow">Broad subjects</p><h2 id="categories-heading">Choose a category</h2><p>Big-picture collections for exploring a field, practice, or point of view.</p></div></div><span className="post-count">{classifications.categories.length} {classifications.categories.length === 1 ? 'category' : 'categories'}</span></header>
+                    {classifications.categories.length > 0 ? <div className="taxonomy-category-grid">{classifications.categories.map((category, index) => <Link className={`taxonomy-category-card taxonomy-category-card--accent-${index % 4}`} to={`/categories/${category.slug}`} key={category.id}><div className="taxonomy-category-card__top"><span>{String(index + 1).padStart(2, '0')}</span><Icon icon={index % 2 === 0 ? layersIcon : shapesIcon} aria-hidden="true"/></div><div><h3>{category.name}</h3><p>{category.description || 'Explore community writing collected around this subject.'}</p></div><span className="taxonomy-category-card__link">Open collection <Icon icon={arrowRightIcon} aria-hidden="true"/></span></Link>)}</div> : <div className="empty-state"><Icon icon={layersIcon} aria-hidden="true"/><h3>No categories yet</h3><p>Categories will appear here when they are added to the catalogue.</p></div>}
+                </section>
+                <section className="taxonomy-index-section taxonomy-index-section--tags" id="tags" aria-labelledby="tags-heading">
+                    <header className="taxonomy-index-section__heading"><div className="taxonomy-index-section__intro"><span><Icon icon={tagIcon} aria-hidden="true"/></span><div><p className="section-eyebrow">Specific ideas</p><h2 id="tags-heading">Follow a topic trail</h2><p>Jump straight into the themes and techniques you care about most.</p></div></div><span className="post-count">{classifications.tags.length} {classifications.tags.length === 1 ? 'tag' : 'tags'}</span></header>
+                    {classifications.tags.length > 0 ? <div className="taxonomy-tag-cloud">{classifications.tags.map((tag, index) => <Link className={`taxonomy-tag-link taxonomy-tag-link--accent-${index % 4}`} to={`/tags/${tag.slug}`} key={tag.id}><span>#</span><strong>{tag.name}</strong><Icon icon={arrowRightIcon} aria-hidden="true"/></Link>)}</div> : <div className="empty-state"><Icon icon={tagIcon} aria-hidden="true"/><h3>No tags yet</h3><p>Topic trails will appear here as authors begin tagging their work.</p></div>}
+                </section>
             </>}
         </section>
     )
@@ -417,7 +553,7 @@ export function SavedPostsPage() {
         <section className="app-shell community-page saved-page">
             <header className="page-intro"><div><p className="section-eyebrow">Your reading list</p><h1>Saved posts</h1><p>Saved to your ThoughtHub account and available on every device.</p></div></header>
             {isLoading ? <LoadingState label="Loading your saved posts…"/> : error ? <div className="app-alert app-alert--danger" role="alert">{error}</div> : savedPosts.length === 0 ? <div className="empty-state"><Icon icon={bookmarkIcon} aria-hidden="true"/><h2>No saved posts yet</h2><p>Use the Save action on any post to build your personal reading list.</p><Link className="button button--primary" to="/">Explore posts</Link></div> : (
-                <div className="saved-post-grid">{savedPosts.map(({post}) => <article className="saved-post-card" key={post.slug}><div className="saved-post-card__visual"><Icon icon={codeIcon} aria-hidden="true"/></div><div><span className="content-label">{post.category?.name ?? post.post_type}</span><h2><Link to={`/posts/${post.slug}`}>{post.title}</Link></h2><p>{post.excerpt}</p><div className="post-meta-line"><span>By {post.author_username ?? 'Deleted user'}</span><span>{post.reading_time} min read</span></div><SavedPostButton post={{slug: post.slug, title: post.title, excerpt: post.excerpt, author: post.author_username ?? 'Deleted user', category: post.category?.name ?? post.post_type, readingTime: post.reading_time}}/></div></article>)}</div>
+                <div className="saved-post-grid">{savedPosts.map(({post}) => <article className="saved-post-card" key={post.slug}><div className="saved-post-card__visual"><Icon icon={codeIcon} aria-hidden="true"/></div><div><span className="content-label">{post.category?.name ?? post.post_type}</span><h2 dir={getTextDirection(post.title)}><Link to={`/posts/${post.slug}`}>{post.title}</Link></h2><p dir={getTextDirection(post.excerpt)}>{post.excerpt}</p><div className="post-meta-line"><span>By {post.author_username ?? 'Deleted user'}</span><span>{post.reading_time} min read</span></div><SavedPostButton post={{slug: post.slug, title: post.title, excerpt: post.excerpt, author: post.author_username ?? 'Deleted user', category: post.category?.name ?? post.post_type, readingTime: post.reading_time}}/></div></article>)}</div>
             )}
         </section>
     )
@@ -497,6 +633,9 @@ export function SettingsPage() {
 
     if (!user) return <Navigate to="/login" replace/>
 
+    const displayName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username
+    const initials = `${user.first_name[0] ?? ''}${user.last_name[0] ?? user.username[0]}`.toUpperCase()
+
     async function saveProfile(event: FormEvent<HTMLFormElement>) {
         event.preventDefault()
         setIsSaving(true)
@@ -519,17 +658,83 @@ export function SettingsPage() {
 
     return (
         <section className="app-shell community-page settings-page">
-            <header className="page-intro"><div><p className="section-eyebrow">Your account</p><h1>Settings</h1><p>Manage how you appear and how ThoughtHub works for you.</p></div></header>
+            <header className="settings-hero">
+                <div className="settings-hero__copy">
+                    <p className="section-eyebrow"><Icon icon={paletteIcon} aria-hidden="true"/>Personal workspace</p>
+                    <h1>Make ThoughtHub yours.</h1>
+                    <p>Shape your public identity and choose the reading experience that feels right for you.</p>
+                </div>
+                <div className="settings-hero__identity">
+                    <div className="settings-avatar" aria-hidden="true">{initials}</div>
+                    <div>
+                        <span>Signed in as</span>
+                        <strong>{displayName}</strong>
+                        <small>@{user.username}</small>
+                    </div>
+                </div>
+            </header>
             <div className="settings-layout">
                 <aside className="settings-nav" aria-label="Settings sections">
-                    <button type="button" aria-pressed={tab === 'profile'} onClick={() => {setTab('profile'); setFeedback('')}}><Icon icon={userIcon} aria-hidden="true"/>Profile</button>
-                    <button type="button" aria-pressed={tab === 'appearance'} onClick={() => {setTab('appearance'); setFeedback('')}}><Icon icon={compassIcon} aria-hidden="true"/>Appearance</button>
+                    <div className="settings-nav__heading"><strong>Preferences</strong><span>Choose what you want to personalize.</span></div>
+                    <button type="button" aria-pressed={tab === 'profile'} onClick={() => {setTab('profile'); setFeedback('')}}>
+                        <span className="settings-nav__icon"><Icon icon={userIcon} aria-hidden="true"/></span>
+                        <span className="settings-nav__label"><strong>Profile</strong><small>Name and contact</small></span>
+                        <Icon className="settings-nav__arrow" icon={arrowRightIcon} aria-hidden="true"/>
+                    </button>
+                    <button type="button" aria-pressed={tab === 'appearance'} onClick={() => {setTab('appearance'); setFeedback('')}}>
+                        <span className="settings-nav__icon"><Icon icon={paletteIcon} aria-hidden="true"/></span>
+                        <span className="settings-nav__label"><strong>Appearance</strong><small>Theme and display</small></span>
+                        <Icon className="settings-nav__arrow" icon={arrowRightIcon} aria-hidden="true"/>
+                    </button>
+                    <div className="settings-nav__privacy"><Icon icon={lockIcon} aria-hidden="true"/><p><strong>Your details, your control.</strong><span>Profile changes only update when you save.</span></p></div>
                 </aside>
-                <div className="settings-panel">
-                    {tab === 'profile' && <><div className="settings-panel__heading"><div><h2>Public profile</h2><p>Update the name and email connected to your account.</p></div></div><div className="profile-account-summary"><div className="profile-avatar" aria-hidden="true">{`${user.first_name[0] ?? ''}${user.last_name[0] ?? user.username[0]}`.toUpperCase()}</div><div><strong>{[user.first_name, user.last_name].filter(Boolean).join(' ') || user.username}</strong><span>@{user.username}</span><span>{user.email}</span></div></div><form className="settings-profile-form" onSubmit={saveProfile}><label className="field"><span>First name</span><input type="text" name="first_name" autoComplete="given-name" value={profileData.first_name} maxLength={150} disabled={isSaving} onChange={(event) => {setProfileData((current) => ({...current, first_name: event.target.value})); setProfileErrors((current) => ({...current, first_name: []}))}}/>{profileErrors.first_name?.[0] && <small className="field-error">{profileErrors.first_name[0]}</small>}</label><label className="field"><span>Last name</span><input type="text" name="last_name" autoComplete="family-name" value={profileData.last_name} maxLength={150} disabled={isSaving} onChange={(event) => {setProfileData((current) => ({...current, last_name: event.target.value})); setProfileErrors((current) => ({...current, last_name: []}))}}/>{profileErrors.last_name?.[0] && <small className="field-error">{profileErrors.last_name[0]}</small>}</label><label className="field"><span>Email address</span><input type="email" name="email" autoComplete="email" value={profileData.email} required disabled={isSaving} onChange={(event) => {setProfileData((current) => ({...current, email: event.target.value})); setProfileErrors((current) => ({...current, email: []}))}}/>{profileErrors.email?.[0] && <small className="field-error">{profileErrors.email[0]}</small>}</label><div className="system-state-page__actions"><button className="button button--primary" type="submit" disabled={isSaving}>{isSaving ? 'Saving…' : 'Save profile'}</button><Link className="button button--secondary" to={`/profile/${user.username}`}>View public profile</Link></div></form></>}
-                    {tab === 'appearance' && <><div className="settings-panel__heading"><div><h2>Appearance</h2><p>Choose the theme that is easiest for you to read.</p></div></div><fieldset className="theme-options"><legend>Theme preference</legend><label><input type="radio" name="theme" checked={theme === 'light'} onChange={() => applyTheme('light')}/><span><strong>Light</strong><small>Use a light background and dark text.</small></span></label><label><input type="radio" name="theme" checked={theme === 'dark'} onChange={() => applyTheme('dark')}/><span><strong>Dark</strong><small>Use a dark background and light text.</small></span></label></fieldset><p className="settings-inline-note">Theme changes apply immediately and are saved on this device.</p></>}
-                    <p className="form-feedback" role="status">{feedback}</p>
-                </div>
+                <section className="settings-panel" aria-live="polite">
+                    {tab === 'profile' && (
+                        <div className="settings-section">
+                            <header className="settings-panel__heading">
+                                <div className="settings-panel__title"><span><Icon icon={userIcon} aria-hidden="true"/></span><div><p className="section-eyebrow">Identity</p><h2>Public profile</h2><p>Keep your name and contact details accurate.</p></div></div>
+                                <span className="settings-status-pill"><Icon icon={checkIcon} aria-hidden="true"/>Visible to readers</span>
+                            </header>
+                            <div className="profile-account-summary">
+                                <div className="settings-avatar" aria-hidden="true">{initials}</div>
+                                <div className="profile-account-summary__details"><span>Profile preview</span><strong>{displayName}</strong><small>@{user.username} · {user.email}</small></div>
+                                <Link className="button button--secondary button--small" to={`/profile/${user.username}`}>Open profile <Icon icon={arrowRightIcon} aria-hidden="true"/></Link>
+                            </div>
+                            <form className="settings-profile-form" onSubmit={saveProfile}>
+                                <div className="settings-form__heading"><h3>Personal details</h3><p>This information helps readers know who is behind your ideas.</p></div>
+                                <label className="field"><span>First name</span><span className="settings-field-control"><Icon icon={userIcon} aria-hidden="true"/><input type="text" name="first_name" autoComplete="given-name" value={profileData.first_name} maxLength={150} disabled={isSaving} onChange={(event) => {setProfileData((current) => ({...current, first_name: event.target.value})); setProfileErrors((current) => ({...current, first_name: []}))}}/></span>{profileErrors.first_name?.[0] && <small className="field-error">{profileErrors.first_name[0]}</small>}</label>
+                                <label className="field"><span>Last name</span><span className="settings-field-control"><Icon icon={userIcon} aria-hidden="true"/><input type="text" name="last_name" autoComplete="family-name" value={profileData.last_name} maxLength={150} disabled={isSaving} onChange={(event) => {setProfileData((current) => ({...current, last_name: event.target.value})); setProfileErrors((current) => ({...current, last_name: []}))}}/></span>{profileErrors.last_name?.[0] && <small className="field-error">{profileErrors.last_name[0]}</small>}</label>
+                                <label className="field"><span>Email address</span><span className="settings-field-control"><Icon icon={mailIcon} aria-hidden="true"/><input type="email" name="email" autoComplete="email" value={profileData.email} required disabled={isSaving} onChange={(event) => {setProfileData((current) => ({...current, email: event.target.value})); setProfileErrors((current) => ({...current, email: []}))}}/></span>{profileErrors.email?.[0] && <small className="field-error">{profileErrors.email[0]}</small>}</label>
+                                <footer className="settings-form__footer"><p className="form-feedback" role="status">{feedback}</p><div><Link className="button button--secondary" to={`/profile/${user.username}`}>Cancel</Link><button className="button button--primary" type="submit" disabled={isSaving}><Icon icon={checkIcon} aria-hidden="true"/>{isSaving ? 'Saving…' : 'Save changes'}</button></div></footer>
+                            </form>
+                        </div>
+                    )}
+                    {tab === 'appearance' && (
+                        <div className="settings-section">
+                            <header className="settings-panel__heading">
+                                <div className="settings-panel__title"><span><Icon icon={paletteIcon} aria-hidden="true"/></span><div><p className="section-eyebrow">Display</p><h2>Appearance</h2><p>Choose the contrast and mood that feels easiest to read.</p></div></div>
+                            </header>
+                            <fieldset className="theme-options">
+                                <legend>Theme preference</legend>
+                                <div className="theme-options__grid">
+                                    <label className="theme-option">
+                                        <input type="radio" name="theme" checked={theme === 'light'} onChange={() => applyTheme('light')}/>
+                                        <span className="theme-option__preview theme-option__preview--light" aria-hidden="true"><span className="theme-option__browser"><i/><i/><i/></span><span className="theme-option__canvas"><span/><span><i/><i/><i/></span></span></span>
+                                        <span className="theme-option__details"><span><Icon icon={sunIcon} aria-hidden="true"/></span><span><strong>Light</strong><small>Bright, calm, and crisp.</small></span></span>
+                                        <span className="theme-option__check" aria-hidden="true"><Icon icon={checkIcon}/></span>
+                                    </label>
+                                    <label className="theme-option">
+                                        <input type="radio" name="theme" checked={theme === 'dark'} onChange={() => applyTheme('dark')}/>
+                                        <span className="theme-option__preview theme-option__preview--dark" aria-hidden="true"><span className="theme-option__browser"><i/><i/><i/></span><span className="theme-option__canvas"><span/><span><i/><i/><i/></span></span></span>
+                                        <span className="theme-option__details"><span><Icon icon={moonIcon} aria-hidden="true"/></span><span><strong>Dark</strong><small>Focused, soft, and low-glare.</small></span></span>
+                                        <span className="theme-option__check" aria-hidden="true"><Icon icon={checkIcon}/></span>
+                                    </label>
+                                </div>
+                            </fieldset>
+                            <div className="settings-device-note"><Icon icon={compassIcon} aria-hidden="true"/><div><strong>Instant preview</strong><p>Your theme changes immediately and is remembered on this device.</p></div></div>
+                        </div>
+                    )}
+                </section>
             </div>
         </section>
     )
@@ -674,7 +879,7 @@ export function RemovedPostPage() {
     if (post.status !== 'removed') return <Navigate to={`/dashboard/posts/${post.id}/edit`} replace/>
 
     return (
-        <section className="app-shell community-page removed-page"><div className="removed-summary"><div className="panel-icon"><Icon icon={shieldCheckIcon} aria-hidden="true"/></div><p className="section-eyebrow">Post removed</p><h1>Your idea is not lost.</h1><p>This post is hidden from readers, but you can edit it and republish immediately after fixing the issue.</p><div><Link className="button button--primary" to={`/dashboard/posts/${post.id}/edit`}><Icon icon={penLineIcon} aria-hidden="true"/>Revise post</Link><Link className="button button--secondary" to="/dashboard">Return to dashboard</Link></div></div><article className="moderation-feedback-card"><header><span>Moderation feedback</span><strong>{post.title}</strong></header><div><p className="content-label">Why it was removed</p><blockquote>{post.review_feedback || 'Review the community guidelines before republishing this post.'}</blockquote><h2>What to do next</h2><ol><li><span>1</span>Open the post editor.</li><li><span>2</span>Fix the issue described above.</li><li><span>3</span>Select “Save and republish.”</li></ol><Link to="/guidelines">Read the community guidelines <Icon icon={arrowRightIcon} aria-hidden="true"/></Link></div></article></section>
+        <section className="app-shell community-page removed-page"><div className="removed-summary"><div className="panel-icon"><Icon icon={shieldCheckIcon} aria-hidden="true"/></div><p className="section-eyebrow">Post removed</p><h1>Your idea is not lost.</h1><p>This post is hidden from readers, but you can edit it and republish immediately after fixing the issue.</p><div><Link className="button button--primary" to={`/dashboard/posts/${post.id}/edit`}><Icon icon={penLineIcon} aria-hidden="true"/>Revise post</Link><Link className="button button--secondary" to="/dashboard">Return to dashboard</Link></div></div><article className="moderation-feedback-card"><header><span>Moderation feedback</span><strong dir={getTextDirection(post.title)}>{post.title}</strong></header><div><p className="content-label">Why it was removed</p><blockquote dir={getTextDirection(post.review_feedback)}>{post.review_feedback || 'Review the community guidelines before republishing this post.'}</blockquote><h2>What to do next</h2><ol><li><span>1</span>Open the post editor.</li><li><span>2</span>Fix the issue described above.</li><li><span>3</span>Select “Save and republish.”</li></ol><Link to="/guidelines">Read the community guidelines <Icon icon={arrowRightIcon} aria-hidden="true"/></Link></div></article></section>
     )
 }
 

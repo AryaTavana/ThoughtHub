@@ -158,7 +158,9 @@ describe('application routes', () => {
       screen.getByRole('heading', { name: 'Log in' }),
     ).toBeInTheDocument()
     expect(
-      screen.queryByRole('heading', { name: 'Your posts' }),
+      screen.queryByRole('heading', {
+        name: 'Your writing, all in one place.',
+      }),
     ).not.toBeInTheDocument()
   })
 
@@ -169,7 +171,9 @@ describe('application routes', () => {
     })
 
     expect(
-      screen.getByRole('heading', { name: 'Your posts' }),
+      screen.getByRole('heading', {
+        name: 'Your writing, all in one place.',
+      }),
     ).toBeInTheDocument()
     expect(
       screen.getByText('Loading your posts…'),
@@ -183,7 +187,9 @@ describe('application routes', () => {
     })
 
     expect(
-      await screen.findByRole('heading', {name: 'Your posts'}),
+      await screen.findByRole('heading', {
+        name: 'Your writing, all in one place.',
+      }),
     ).toBeInTheDocument()
   })
 

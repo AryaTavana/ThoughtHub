@@ -20,6 +20,7 @@ import {
     getApiFieldErrors,
 } from '../api/errors'
 import {useAuth} from '../auth/useAuth'
+import {getTextDirection} from '../textDirection'
 
 interface PostCommentFormProps {
     slug: string
@@ -153,6 +154,7 @@ function AuthenticatedPostCommentForm({
                             required
                             disabled={isSubmitting}
                             value={content}
+                            dir={getTextDirection(content)}
                             aria-invalid={Boolean(
                                 contentError,
                             )}

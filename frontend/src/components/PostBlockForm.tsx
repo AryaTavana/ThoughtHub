@@ -17,6 +17,7 @@ import {
     type ImageWidth,
     type PostBlockType,
 } from '../api/posts'
+import {getTextDirection} from '../textDirection'
 
 const BLOCK_TYPE_OPTIONS: Array<{
     value: PostBlockType
@@ -328,6 +329,7 @@ export function PostBlockForm({
                             }`}
                             name="content"
                             value={formData.content}
+                            dir={getTextDirection(formData.content)}
                             onChange={handleTextChange}
                             rows={4}
                             disabled={isSubmitting}
@@ -362,6 +364,9 @@ export function PostBlockForm({
                             }`}
                             name="quote_attribution"
                             value={formData.quote_attribution}
+                            dir={getTextDirection(
+                                formData.quote_attribution,
+                            )}
                             onChange={handleTextChange}
                             maxLength={200}
                             disabled={isSubmitting}
@@ -472,6 +477,7 @@ export function PostBlockForm({
                             }`}
                             name="image_alt"
                             value={formData.image_alt}
+                            dir={getTextDirection(formData.image_alt)}
                             onChange={handleTextChange}
                             maxLength={200}
                             disabled={isSubmitting}
@@ -504,6 +510,7 @@ export function PostBlockForm({
                             }`}
                             name="caption"
                             value={formData.caption}
+                            dir={getTextDirection(formData.caption)}
                             onChange={handleTextChange}
                             maxLength={300}
                             disabled={isSubmitting}

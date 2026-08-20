@@ -30,6 +30,7 @@ import {
     containsSupportedMarkup,
     sanitizeRichText,
 } from '../richText'
+import {getTextDirection} from '../textDirection'
 
 const postDateFormatter = new Intl.DateTimeFormat(
     undefined,
@@ -200,10 +201,15 @@ export function PublicPostDetailPage() {
                                     )}
                                 </div>
 
-                                <h1>{post.title}</h1>
+                                <h1 dir={getTextDirection(post.title)}>
+                                    {post.title}
+                                </h1>
 
                                 {post.excerpt && (
-                                    <p className="post-article__excerpt">
+                                    <p
+                                        className="post-article__excerpt"
+                                        dir={getTextDirection(post.excerpt)}
+                                    >
                                         {post.excerpt}
                                     </p>
                                 )}
@@ -333,13 +339,19 @@ export function PublicPostDetailPage() {
                                         containsSupportedMarkup(post.content) ? (
                                             <div
                                                 className="post-article__legacy-content"
+                                                dir={getTextDirection(post.content)}
                                                 dangerouslySetInnerHTML={{
                                                     __html: sanitizeRichText(post.content),
                                                 }}
                                             />
                                         ) : (
                                             <div className="post-article__legacy-content">
-                                                <p className="post-article__plain-content">
+                                                <p
+                                                    className="post-article__plain-content"
+                                                    dir={getTextDirection(
+                                                        post.content,
+                                                    )}
+                                                >
                                                     {post.content}
                                                 </p>
                                             </div>

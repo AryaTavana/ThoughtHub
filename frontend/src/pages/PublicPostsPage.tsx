@@ -18,6 +18,7 @@ import {
 } from '../api/posts'
 import {SavedPostButton} from '../components/SavedPostButton'
 import {ThoughtHubIcon} from '../components/ThoughtHubIcon'
+import {getTextDirection} from '../textDirection'
 
 const publishedDateFormatter = new Intl.DateTimeFormat(undefined, {
     dateStyle: 'medium',
@@ -206,8 +207,8 @@ export function PublicPostsPage() {
                                                 {post.category ? <Link className="content-label" to={`/categories/${post.category.slug}`}>{post.category.name}</Link> : <span className="content-label">{post.post_type}</span>}
                                                 <SavedPostButton post={{slug: post.slug, title: post.title, excerpt: post.excerpt, author: post.author_username ?? 'Deleted user', category: post.category?.name ?? post.post_type, readingTime: post.reading_time}}/>
                                             </div>
-                                            <h3><Link to={`/posts/${post.slug}`}>{post.title}</Link></h3>
-                                            {post.excerpt && <p>{post.excerpt}</p>}
+                                            <h3 dir={getTextDirection(post.title)}><Link to={`/posts/${post.slug}`}>{post.title}</Link></h3>
+                                            {post.excerpt && <p dir={getTextDirection(post.excerpt)}>{post.excerpt}</p>}
                                             <div className="post-card__tag-slot">
                                                 {post.tags.length > 0 && <div className="post-tags">{post.tags.map((tag) => <Link to={`/tags/${tag.slug}`} key={tag.id}>#{tag.name}</Link>)}</div>}
                                             </div>

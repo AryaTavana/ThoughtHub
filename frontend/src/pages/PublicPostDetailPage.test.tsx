@@ -283,6 +283,34 @@ describe('PublicPostDetailPage', () => {
     expect(container).not.toHaveTextContent('<p>')
   })
 
+  it('sets Farsi post text to RTL without mirroring page controls', async () => {
+    getPublishedPostMock.mockResolvedValue({
+      ...publishedPost,
+      title: 'کنترل سرعت موتور DC با کنترل‌کننده PID',
+      excerpt: 'یک روش عملی برای تنظیم PID ارائه می‌کنیم.',
+      content: 'سرعت مرجع با سرعت اندازه‌گیری‌شده مقایسه می‌شود.',
+      blocks: [],
+    })
+    const { container } = renderDetailPage()
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'کنترل سرعت موتور DC با کنترل‌کننده PID',
+      }),
+    ).toHaveAttribute('dir', 'rtl')
+    expect(
+      screen.getByText('یک روش عملی برای تنظیم PID ارائه می‌کنیم.'),
+    ).toHaveAttribute('dir', 'rtl')
+    expect(
+      screen.getByText(
+        'سرعت مرجع با سرعت اندازه‌گیری‌شده مقایسه می‌شود.',
+      ),
+    ).toHaveAttribute('dir', 'rtl')
+    expect(
+      container.querySelector('.post-article__sidecar'),
+    ).not.toHaveAttribute('dir')
+  })
+
   it('shows a dedicated not-found state for a 404 response', async () => {
     getPublishedPostMock.mockRejectedValue(
       new ApiError(

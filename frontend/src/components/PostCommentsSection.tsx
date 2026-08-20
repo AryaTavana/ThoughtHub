@@ -13,6 +13,7 @@ import {
 } from '../api/comments'
 import {getApiErrorMessage} from '../api/errors'
 import type {PaginatedResponse} from '../api/pagination'
+import {getTextDirection} from '../textDirection'
 import {PostCommentForm} from './PostCommentForm'
 
 interface PostCommentsSectionProps {
@@ -196,6 +197,9 @@ export function PostCommentsSection({
 
                                                 <p
                                                     className="public-comment-card__content"
+                                                    dir={getTextDirection(
+                                                        comment.content,
+                                                    )}
                                                     style={{
                                                         whiteSpace:
                                                             'pre-wrap',

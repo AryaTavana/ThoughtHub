@@ -76,6 +76,24 @@ describe('PostContentBlock', () => {
     expect(container).not.toHaveTextContent("alert('script')")
   })
 
+  it('renders Farsi rich text in RTL while preserving mixed terms', () => {
+    const block = createBlock({
+      block_type: 'rich_text',
+      content:
+        '<h2>کنترل سرعت موتور DC</h2><p>تنظیم PID را بررسی می‌کنیم.</p>',
+    })
+    const { container } = render(
+      <PostContentBlock block={block} />,
+    )
+
+    expect(container.querySelector('.post-rich-text')).toHaveAttribute(
+      'dir',
+      'rtl',
+    )
+    expect(screen.getByText(/DC/)).toBeInTheDocument()
+    expect(screen.getByText(/PID/)).toBeInTheDocument()
+  })
+
   const imageWidthCases: Array<[ImageWidth, string]> = [
     ['content', 'col-lg-8'],
     ['wide', 'col-lg-10'],

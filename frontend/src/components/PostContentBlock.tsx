@@ -7,6 +7,7 @@ import type {
     PublicPostBlock,
 } from '../api/posts'
 import {sanitizeRichText} from '../richText'
+import {getTextDirection} from '../textDirection'
 
 interface PostContentBlockProps {
     block: PublicPostBlock
@@ -46,6 +47,7 @@ export function PostContentBlock({
             return (
                 <div
                     className="post-rich-text post-content-block"
+                    dir={getTextDirection(block.content)}
                     dangerouslySetInnerHTML={{
                         __html: sanitizedContent,
                     }}
@@ -72,7 +74,9 @@ export function PostContentBlock({
                     />
 
                     {block.caption && (
-                        <figcaption>
+                        <figcaption
+                            dir={getTextDirection(block.caption)}
+                        >
                             {block.caption}
                         </figcaption>
                     )}
@@ -113,14 +117,20 @@ export function PostContentBlock({
             return (
                 <figure className="post-quote-block">
                     <span aria-hidden="true">“</span>
-                    <blockquote>
+                    <blockquote
+                        dir={getTextDirection(block.content)}
+                    >
                         <p>
                             {block.content}
                         </p>
                     </blockquote>
 
                     {block.quote_attribution && (
-                        <figcaption>
+                        <figcaption
+                            dir={getTextDirection(
+                                block.quote_attribution,
+                            )}
+                        >
                             {block.quote_attribution}
                         </figcaption>
                     )}

@@ -193,9 +193,44 @@ describe('DashboardPage', () => {
     ).toHaveAttribute('src', '/media/posts/architecture.jpg')
   })
 
+  it('filters the current post page by publishing status', async () => {
+    getAuthorPostsMock.mockResolvedValue(postsPage)
+    const user = userEvent.setup()
+
+    renderDashboard()
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Published architecture guide',
+      }),
+    ).toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Needs revision 1',
+      }),
+    )
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'Article needing revision',
+      }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Published architecture guide',
+      }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', {
+        name: 'Needs revision 1',
+      }),
+    ).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('shows an author their comment status and moderation feedback', async () => {
     getAuthorCommentsMock.mockResolvedValue({
-      count: 1,
+      count: 2,
       next: null,
       previous: null,
       results: [
@@ -211,8 +246,20 @@ describe('DashboardPage', () => {
           created_at: '2026-07-30T10:00:00Z',
           updated_at: '2026-07-30T11:00:00Z',
         },
+        {
+          id: 41,
+          post_title: 'Library rituals',
+          post_slug: 'library-rituals',
+          post_status: 'published',
+          content: 'A published comment.',
+          status: 'approved',
+          moderation_feedback: '',
+          created_at: '2026-07-31T10:00:00Z',
+          updated_at: '2026-07-31T10:00:00Z',
+        },
       ],
     })
+    const user = userEvent.setup()
 
     renderDashboard()
 
@@ -229,6 +276,17 @@ describe('DashboardPage', () => {
         'Please keep comments related to the post.',
       ),
     ).toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole('button', {name: 'Removed 1'}),
+    )
+
+    expect(
+      screen.getByText('A comment that was removed.'),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText('A published comment.'),
+    ).not.toBeInTheDocument()
   })
 
   it('renders an empty state for a new author', async () => {

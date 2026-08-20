@@ -192,6 +192,10 @@ STORAGES = {
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+# Alwaysdata's free WSGI plan does not provide a separate media hostname. This
+# opt-in keeps local development unchanged while allowing small personal
+# deployments to serve uploaded files through Django.
+SERVE_MEDIA = env_bool('DJANGO_SERVE_MEDIA', False)
 
 EMAIL_BACKEND = os.environ.get(
     'EMAIL_BACKEND',
@@ -207,8 +211,8 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = env_bool('EMAIL_USE_TLS')
 
-# Caddy is the only service exposed by the production Compose stack. Trust its
-# forwarded scheme so Django generates HTTPS URLs and avoids redirect loops.
+# Both Caddy and Alwaysdata's front proxy send this header. Trust the forwarded
+# scheme so Django generates HTTPS URLs and avoids redirect loops.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 

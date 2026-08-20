@@ -364,7 +364,9 @@ ThoughtHub/
 
 ## Production notes
 
-This repository contains the application code, not a complete hosting recipe. Before deploying it:
+Complete deployment recipes are available for
+[Alwaysdata Free](deploy/alwaysdata/README.md) and
+[an Oracle Cloud VM](deploy/oracle/README.md). Before deploying elsewhere:
 
 - Set `DJANGO_DEBUG=False` and generate a unique `DJANGO_SECRET_KEY`.
 - Set the public hosts, frontend URL, and trusted CSRF origins precisely.

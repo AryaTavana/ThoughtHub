@@ -1,0 +1,11 @@
+# Runtime-only dependencies for small managed hosts such as Alwaysdata.
+# Development typing packages and Gunicorn are intentionally omitted because
+# Alwaysdata supplies the uWSGI process that imports ThoughtHub/wsgi.py.
+Django==6.1
+django-unfold==1.0.0
+djangorestframework==3.18.0
+pillow==12.3.0
+psycopg==3.3.4
+psycopg-binary==3.3.4
+python-dotenv==1.2.3
+whitenoise==6.12.0

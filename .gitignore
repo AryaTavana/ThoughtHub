@@ -15,6 +15,7 @@ Thumbs.db
 !*.env.example
 *.local
 deploy/oracle/oracle.env
+deploy/alwaysdata/alwaysdata.env
 backups/
 
 # Python

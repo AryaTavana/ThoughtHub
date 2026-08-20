@@ -1,5 +1,8 @@
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
 from django.conf import settings
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 
 
 class DeploymentRoutingTests(SimpleTestCase):
@@ -22,3 +25,25 @@ class DeploymentRoutingTests(SimpleTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '<div id="root"></div>', html=True)
+
+    def test_media_can_be_served_by_small_managed_hosts(self):
+        with TemporaryDirectory() as media_root:
+            Path(media_root, 'example.txt').write_text(
+                'ThoughtHub media',
+                encoding='utf-8',
+            )
+            with override_settings(
+                DEBUG=False,
+                SERVE_MEDIA=True,
+                MEDIA_ROOT=Path(media_root),
+            ):
+                response = self.client.get('/media/example.txt')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(b''.join(response.streaming_content), b'ThoughtHub media')
+
+    @override_settings(DEBUG=False, SERVE_MEDIA=False)
+    def test_media_is_disabled_in_production_by_default(self):
+        response = self.client.get('/media/example.txt')
+
+        self.assertEqual(response.status_code, 404)

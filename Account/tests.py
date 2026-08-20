@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import force_bytes
@@ -13,6 +14,36 @@ from Blog.models import Category, Post, PostBlock, Tag
 
 
 User = get_user_model()
+
+
+@override_settings(
+    STORAGES={
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': (
+                'django.contrib.staticfiles.storage.StaticFilesStorage'
+            ),
+        },
+    },
+)
+class AdminChangelistTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin_user = User.objects.create_superuser(
+            username='admin-list-test',
+            email='admin-list-test@example.com',
+            password='Admin!Passphrase-47',
+        )
+
+    def test_user_changelist_renders(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(reverse('admin:auth_user_changelist'))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertContains(response, self.admin_user.username)
 
 
 class CSRFTokenAPITests(APITestCase):

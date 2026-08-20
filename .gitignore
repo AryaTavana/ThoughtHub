@@ -17,6 +17,7 @@ Thumbs.db
 deploy/oracle/oracle.env
 deploy/alwaysdata/alwaysdata.env
 deploy/alwaysdata/account-credentials.env
+deploy/alwaysdata/admin-credentials.env
 backups/
 
 # Python

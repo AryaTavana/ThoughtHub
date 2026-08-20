@@ -8,7 +8,7 @@
 
   <p>
     <img alt="Python 3.12+" src="https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white">
-    <img alt="Django 6.1" src="https://img.shields.io/badge/Django-6.1-092E20?logo=django&logoColor=white">
+    <img alt="Django 6.0.8" src="https://img.shields.io/badge/Django-6.0.8-092E20?logo=django&logoColor=white">
     <img alt="React 19.2.8" src="https://img.shields.io/badge/React-19.2.8-61DAFB?logo=react&logoColor=101010">
     <img alt="TypeScript 6.0.3" src="https://img.shields.io/badge/TypeScript-6.0.3-3178C6?logo=typescript&logoColor=white">
     <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-Database-4169E1?logo=postgresql&logoColor=white">

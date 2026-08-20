@@ -1,5 +1,5 @@
 asgiref==3.12.1
-Django==6.1
+Django==6.0.8
 django-stubs==6.1.0
 django-stubs-ext==6.1.0
 django-unfold==1.0.0
